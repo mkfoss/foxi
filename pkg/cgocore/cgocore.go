@@ -2,8 +2,9 @@
 // This package offers maximum performance through direct C library integration but requires CGO.
 //
 // Usage:
-//   import "github.com/mkfoss/foxi/pkg/cgocore"
-//   // Use C library functions directly
+//
+//	import "github.com/mkfoss/foxi/pkg/cgocore"
+//	// Use C library functions directly
 //
 // For a high-level unified interface that can switch between backends, use the main foxi package instead.
 package cgocore

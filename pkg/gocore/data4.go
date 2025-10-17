@@ -43,7 +43,7 @@ func D4Open(cb *Code4, fileName string) *Data4 {
 		atEof:    false,
 	}
 
-	// Create DATA4FILE structure  
+	// Create DATA4FILE structure
 	dataFile := &Data4File{
 		CodeBase: cb,
 	}
@@ -77,7 +77,7 @@ func D4Open(cb *Code4, fileName string) *Data4 {
 	// Allocate record buffers
 	recordLen := int(dataFile.RecordLen)
 	data.Record = make([]byte, recordLen)
-	data.RecordOld = make([]byte, recordLen) 
+	data.RecordOld = make([]byte, recordLen)
 	data.RecordBlank = make([]byte, recordLen)
 
 	// Initialize blank record template
@@ -122,7 +122,7 @@ func parseDbfHeader(dataFile *Data4File) int {
 
 	// Parse basic header fields
 	header.Version = headerBuf[0]
-	header.Year = headerBuf[1] 
+	header.Year = headerBuf[1]
 	header.Month = headerBuf[2]
 	header.Day = headerBuf[3]
 	header.NumRecs = int32(binary.LittleEndian.Uint32(headerBuf[4:8]))
@@ -155,7 +155,7 @@ func parseFieldDefs(dataFile *Data4File) int {
 	fieldBuf := make([]byte, 32)
 	pos := int64(32)
 	offset := uint32(1) // DBF records start with delete flag
-	
+
 	for {
 		// Read one byte to check for terminator
 		termBuf := make([]byte, 1)
@@ -163,12 +163,12 @@ func parseFieldDefs(dataFile *Data4File) int {
 		if bytesRead != 1 {
 			return ErrorRead
 		}
-		
+
 		// Check for header terminator
 		if termBuf[0] == 0x0D {
 			break // End of field definitions
 		}
-		
+
 		// Read the full 32-byte field definition
 		bytesRead = File4Read(&dataFile.File, pos, fieldBuf, 32)
 		if bytesRead != 32 {
@@ -181,7 +181,7 @@ func parseFieldDefs(dataFile *Data4File) int {
 
 		// Parse field name (first 11 bytes, null-terminated)
 		copy(field.Name[:], fieldBuf[0:11])
-		
+
 		// Parse field type
 		fieldType := fieldBuf[11]
 		field.Type = int16(fieldType)
@@ -219,12 +219,12 @@ func parseFieldDefs(dataFile *Data4File) int {
 		fields = append(fields, field)
 		pos += 32 // Move to next field definition
 	}
-	
+
 	// Set up the field array
 	if len(fields) == 0 {
 		return ErrorData
 	}
-	
+
 	dataFile.Fields = fields
 	dataFile.NumFields = int16(len(fields))
 
@@ -234,7 +234,7 @@ func parseFieldDefs(dataFile *Data4File) int {
 // initBlankRecord initializes the blank record template
 func initBlankRecord(data *Data4) {
 	recordLen := int(data.DataFile.RecordLen)
-	
+
 	// Fill with spaces (standard DBF padding)
 	for i := 0; i < recordLen; i++ {
 		data.RecordBlank[i] = ' '
@@ -482,7 +482,7 @@ func D4Go(data *Data4, recordNum int32) int {
 
 	// Update position state
 	data.recNo = recordNum
-	data.atEof = false  // We're on a valid record, not at EOF
+	data.atEof = false // We're on a valid record, not at EOF
 	data.atBof = (recordNum == 1)
 
 	return ErrorNone
@@ -597,7 +597,7 @@ func D4Field(data *Data4, fieldName string) *Field4 {
 	}
 
 	upperName := strings.ToUpper(fieldName)
-	
+
 	for _, field := range data.Fields {
 		fieldNameStr := strings.ToUpper(getFieldName(field))
 		if fieldNameStr == upperName {
@@ -626,7 +626,7 @@ func D4FieldJ(data *Data4, fieldIndex int) *Field4 {
 	}
 
 	field := data.Fields[fieldIndex-1] // Convert to 0-based
-	field.Data = data // Set back-reference
+	field.Data = data                  // Set back-reference
 	return field
 }
 
@@ -647,7 +647,7 @@ func D4FieldNumber(data *Data4, fieldName string) int {
 	}
 
 	upperName := strings.ToUpper(fieldName)
-	
+
 	for i, field := range data.Fields {
 		fieldNameStr := strings.ToUpper(getFieldName(field))
 		if fieldNameStr == upperName {
@@ -683,19 +683,19 @@ func hasMemoFields(dataFile *Data4File) bool {
 func openMemoFile(dataFile *Data4File, dbfFileName string) int {
 	// Construct memo file name by changing extension to .fpt
 	memoFileName := constructPath(dbfFileName, "fpt")
-	
+
 	// Create memo file structure
 	memoFile := &Memo4File{
 		BlockSize: 64, // Default block size
 		Data:      dataFile,
 	}
-	
+
 	// Try to open the memo file
 	err := File4Open(&memoFile.File, dataFile.CodeBase, memoFileName, AccessDenyNone)
 	if err != ErrorNone {
 		return err
 	}
-	
+
 	// Read memo file header to get block size
 	headerBuf := make([]byte, 8)
 	bytesRead := File4Read(&memoFile.File, 0, headerBuf, 8)
@@ -708,7 +708,7 @@ func openMemoFile(dataFile *Data4File, dbfFileName string) int {
 	} else {
 		memoFile.BlockSize = 512 // Default FPT block size
 	}
-	
+
 	dataFile.MemoFile = memoFile
 	return ErrorNone
 }

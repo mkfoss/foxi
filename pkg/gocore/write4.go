@@ -31,7 +31,7 @@ func D4Append(data *Data4) int {
 
 	// The record is now ready for field assignments
 	// The actual write happens when d4append() is called (or d4flush, d4close, etc.)
-	
+
 	return ErrorNone
 }
 
@@ -56,7 +56,7 @@ func D4AppendStart(data *Data4, lockAttempt int) int {
 
 	// Mark as changed for transaction tracking
 	data.TransChanged = 1
-	
+
 	// Initialize transaction state if not already done
 	if data.CodeBase != nil && data.CodeBase.TransactionLevel == 0 {
 		// Auto-start transaction for safety
@@ -237,7 +237,7 @@ func D4Flush(data *Data4) int {
 	return ErrorNone
 }
 
-// D4Update updates header with current date (mirrors d4update)  
+// D4Update updates header with current date (mirrors d4update)
 func D4Update(data *Data4) int {
 	if data == nil || data.DataFile == nil {
 		return ErrorMemory
@@ -246,7 +246,7 @@ func D4Update(data *Data4) int {
 	// Update header date to current date
 	now := time.Now()
 	header := &data.DataFile.Header
-	
+
 	// DBF stores dates as YY/MM/DD since 1900
 	year := now.Year()
 	if year >= 2000 {
@@ -371,7 +371,7 @@ func D4Zap(data *Data4, startRec int32, numRecs int32) int {
 		if err != ErrorNone {
 			return err
 		}
-		
+
 		// Position to empty state
 		data.recNo = 0
 		data.atEof = true

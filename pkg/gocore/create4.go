@@ -70,7 +70,7 @@ func D4Create(cb *Code4, fileName string, fieldInfo []Field4Info) *Data4 {
 	// Calculate header and record layout
 	numFields := int16(len(fieldInfo))
 	headerLen := uint16(32 + (numFields * 32) + 1) // Base header + field descriptors + terminator
-	recordLen := uint16(1) // Start with delete flag byte
+	recordLen := uint16(1)                         // Start with delete flag byte
 
 	// Validate fields and calculate record length
 	fields := make([]*Field4, 0, len(fieldInfo))
@@ -83,8 +83,8 @@ func D4Create(cb *Code4, fileName string, fieldInfo []Field4Info) *Data4 {
 
 		// Validate field type
 		switch info.Type {
-		case FieldTypeChar, FieldTypeNumeric, FieldTypeDate, FieldTypeLogical, 
-			 FieldTypeMemo, FieldTypeFloat, FieldTypeInteger, FieldTypeCurrency, FieldTypeDateTime:
+		case FieldTypeChar, FieldTypeNumeric, FieldTypeDate, FieldTypeLogical,
+			FieldTypeMemo, FieldTypeFloat, FieldTypeInteger, FieldTypeCurrency, FieldTypeDateTime:
 			// Valid types
 		default:
 			File4Close(&dataFile.File)
@@ -300,5 +300,3 @@ func D4CreateData(cb *Code4, fileName string, fieldInfo []Field4Info, tag *Tag4)
 
 	return data
 }
-
-

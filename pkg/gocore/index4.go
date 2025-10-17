@@ -14,41 +14,41 @@ import (
 
 // CDX file header constants
 const (
-	CDXHeaderSize    = 512
-	CDXTagDescSize   = 32
-	CDXBlockSize     = 512
-	CDXMaxTags       = 48
-	CDXSignature     = 0x01
-	CDXTypeUnique    = 0x01
-	CDXTypeFor       = 0x08
-	CDXTypeCompact   = 0x32
-	CDXTypeCompound  = 0x80
+	CDXHeaderSize   = 512
+	CDXTagDescSize  = 32
+	CDXBlockSize    = 512
+	CDXMaxTags      = 48
+	CDXSignature    = 0x01
+	CDXTypeUnique   = 0x01
+	CDXTypeFor      = 0x08
+	CDXTypeCompact  = 0x32
+	CDXTypeCompound = 0x80
 )
 
 // CdxHeader represents the CDX file header structure
 type CdxHeader struct {
-	Root       int32    // Root block number
-	FreeList   int32    // Free list start
-	Version    uint32   // Version number
-	KeyLen     int16    // Key length
-	TypeCode   uint8    // Type flags
-	Signature  uint8    // Signature byte
-	SortSeq    [8]byte  // Collating sequence
-	Descending int16    // Descending flag
-	FilterPos  int16    // Filter position
-	FilterLen  int16    // Filter length
-	ExprPos    int16    // Expression position  
-	ExprLen    int16    // Expression length
+	Root       int32   // Root block number
+	FreeList   int32   // Free list start
+	Version    uint32  // Version number
+	KeyLen     int16   // Key length
+	TypeCode   uint8   // Type flags
+	Signature  uint8   // Signature byte
+	SortSeq    [8]byte // Collating sequence
+	Descending int16   // Descending flag
+	FilterPos  int16   // Filter position
+	FilterLen  int16   // Filter length
+	ExprPos    int16   // Expression position
+	ExprLen    int16   // Expression length
 }
 
 // CdxTagDesc represents a tag descriptor in the CDX header
 type CdxTagDesc struct {
-	TagName    [11]byte // Tag name
-	KeyExpr    []byte   // Key expression
-	ForExpr    []byte   // FOR expression
-	Header     CdxHeader // Tag header
-	HeaderPos  int32    // Header position in file
-	TagFile    *Tag4File // Associated tag file
+	TagName   [11]byte  // Tag name
+	KeyExpr   []byte    // Key expression
+	ForExpr   []byte    // FOR expression
+	Header    CdxHeader // Tag header
+	HeaderPos int32     // Header position in file
+	TagFile   *Tag4File // Associated tag file
 }
 
 // I4Open opens an index file (mirrors i4open)
@@ -117,7 +117,7 @@ func I4Open(data *Data4, fileName string) *Index4 {
 // parseCdxHeader reads and parses the main CDX file header
 func parseCdxHeader(indexFile *Index4File) int {
 	headerBuf := make([]byte, CDXHeaderSize)
-	
+
 	// Read the main header
 	bytesRead := File4Read(&indexFile.File, 0, headerBuf, CDXHeaderSize)
 	if bytesRead != CDXHeaderSize {
@@ -133,20 +133,20 @@ func parseCdxHeader(indexFile *Index4File) int {
 func parseCdxTags(indexFile *Index4File) int {
 	// Based on actual CDX file structure analysis, implement proper parsing
 	// CDX compound index format: tags stored at fixed 512-byte block offsets
-	
+
 	// First, read the main CDX header (16 bytes for VFP)
 	headerBuf := make([]byte, 16)
 	bytesRead := File4Read(&indexFile.File, 0, headerBuf, 16)
 	if bytesRead != 16 {
 		return ErrorRead
 	}
-	
+
 	// Parse main header for CDX compound index
-	rootBlock := int32(binary.LittleEndian.Uint32(headerBuf[0:4]))  // Root block number
-	freeList := int32(binary.LittleEndian.Uint32(headerBuf[4:8]))   // Free list
-	version := binary.LittleEndian.Uint32(headerBuf[8:12])          // Version
+	rootBlock := int32(binary.LittleEndian.Uint32(headerBuf[0:4])) // Root block number
+	freeList := int32(binary.LittleEndian.Uint32(headerBuf[4:8]))  // Free list
+	version := binary.LittleEndian.Uint32(headerBuf[8:12])         // Version
 	// keyLen and typeCode from main header not used for compound parsing
-	
+
 	// For compound index, tags are stored at predictable block offsets
 	// Based on hexdump analysis: block 3 (0x600), block 5 (0xa00), etc.
 	tagBlockOffsets := []int64{
@@ -156,7 +156,7 @@ func parseCdxTags(indexFile *Index4File) int {
 		0x1200, // UPPER(name_frc)
 		0x1600, // subcatid
 	}
-	
+
 	var tagCount int
 	for _, offset := range tagBlockOffsets {
 		// Read tag descriptor block
@@ -165,11 +165,11 @@ func parseCdxTags(indexFile *Index4File) int {
 		if bytesRead != CDXBlockSize {
 			continue // Skip invalid blocks
 		}
-		
+
 		// Read expression string directly from the start of the block
 		// Based on hexdump, expressions start at offset 0x00 in each block
 		var expression string
-		
+
 		// Find the null-terminated expression string
 		var exprBytes []byte
 		for j := 0; j < 256 && j < len(tagBlock); j++ {
@@ -182,25 +182,25 @@ func parseCdxTags(indexFile *Index4File) int {
 				break // Non-printable character, end of expression
 			}
 		}
-		
+
 		if len(exprBytes) >= 3 {
 			expression = string(exprBytes)
 		}
-		
+
 		// Read tag properties from the block header area (simplified)
 		// For now, use reasonable defaults and extract key length from expression
-		tagKeyLen := int16(10) // Default key length
+		tagKeyLen := int16(10)  // Default key length
 		tagTypeCode := uint8(0) // Default type
-		
+
 		// Try to determine if unique by checking type code at specific offset
 		if len(tagBlock) > 0x1f6 {
 			tagTypeCode = tagBlock[0x1f6]
 		}
-		
+
 		if expression == "" {
 			continue // Skip blocks without expressions
 		}
-		
+
 		// Create tag file structure
 		tagFile := &Tag4File{
 			CodeBase:     indexFile.CodeBase,
@@ -208,7 +208,7 @@ func parseCdxTags(indexFile *Index4File) int {
 			ExprSource:   expression,
 			HeaderOffset: int32(offset),
 		}
-		
+
 		// Set tag name - for simple expressions, use the expression as name
 		tagName := expression
 		if strings.Contains(expression, "(") {
@@ -224,13 +224,13 @@ func parseCdxTags(indexFile *Index4File) int {
 		} else {
 			tagName = strings.ToUpper(expression)
 		}
-		
+
 		// Set tag name in alias field
 		if len(tagName) > MaxFieldName {
 			tagName = tagName[:MaxFieldName]
 		}
 		copy(tagFile.Alias[:], tagName)
-		
+
 		// Set tag header properties
 		tagFile.Header = CdxHeader{
 			Root:       rootBlock,
@@ -240,35 +240,33 @@ func parseCdxTags(indexFile *Index4File) int {
 			TypeCode:   tagTypeCode,
 			Descending: 0, // Default to ascending
 		}
-		
+
 		list4Add(&indexFile.Tags, &tagFile.Link)
 		tagCount++
 	}
-	
+
 	indexFile.Tags.NumLinks = uint16(tagCount)
 	return ErrorNone
 }
-
-
 
 // isValidTagName checks if a string could be a valid tag name
 func isValidTagName(name string) bool {
 	if len(name) == 0 {
 		return false
 	}
-	
+
 	// Must start with a letter
 	if !(name[0] >= 'A' && name[0] <= 'Z') {
 		return false
 	}
-	
+
 	// Must contain only letters, numbers, and underscores
 	for _, c := range name {
 		if !((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
 			return false
 		}
 	}
-	
+
 	return true
 }
 
@@ -276,7 +274,7 @@ func isValidTagName(name string) bool {
 func readTagHeader(indexFile *Index4File, tagFile *Tag4File, headerPos int32) int {
 	// Calculate actual file position (headerPos is a byte offset, not block)
 	filePos := int64(headerPos)
-	
+
 	headerBuf := make([]byte, CDXBlockSize)
 	bytesRead := File4Read(&indexFile.File, filePos, headerBuf, CDXBlockSize)
 	if bytesRead <= 0 {
@@ -285,20 +283,20 @@ func readTagHeader(indexFile *Index4File, tagFile *Tag4File, headerPos int32) in
 
 	// Parse the tag header (FoxPro CDX format)
 	header := &tagFile.Header
-	
-	// FoxPro CDX format:
-	header.Root = int32(binary.LittleEndian.Uint16(headerBuf[0:2]))	// Root block (2 bytes)
-	header.FreeList = int32(binary.LittleEndian.Uint16(headerBuf[2:4]))	// Free list (2 bytes) 
-	
-	// Skip reserved bytes (4-11)
-	
-	header.KeyLen = int16(binary.LittleEndian.Uint16(headerBuf[12:14]))	// Key length
-	header.TypeCode = headerBuf[14]	// Type/options
-	header.Signature = headerBuf[15]	// Signature (usually 0xFF for leaf pages)
 
-	// Parse collating sequence (bytes 16-23) 
+	// FoxPro CDX format:
+	header.Root = int32(binary.LittleEndian.Uint16(headerBuf[0:2]))     // Root block (2 bytes)
+	header.FreeList = int32(binary.LittleEndian.Uint16(headerBuf[2:4])) // Free list (2 bytes)
+
+	// Skip reserved bytes (4-11)
+
+	header.KeyLen = int16(binary.LittleEndian.Uint16(headerBuf[12:14])) // Key length
+	header.TypeCode = headerBuf[14]                                     // Type/options
+	header.Signature = headerBuf[15]                                    // Signature (usually 0xFF for leaf pages)
+
+	// Parse collating sequence (bytes 16-23)
 	copy(header.SortSeq[:], headerBuf[16:24])
-	
+
 	// Additional parsing for expression, filter positions
 	header.ExprPos = int16(binary.LittleEndian.Uint16(headerBuf[24:26]))
 	header.ExprLen = int16(binary.LittleEndian.Uint16(headerBuf[26:28]))
@@ -318,7 +316,7 @@ func getTagName(nameBytes []byte) string {
 	if nameBytes == nil || len(nameBytes) == 0 {
 		return ""
 	}
-	
+
 	// Find null terminator
 	end := len(nameBytes)
 	for i, b := range nameBytes {
@@ -327,7 +325,7 @@ func getTagName(nameBytes []byte) string {
 			break
 		}
 	}
-	
+
 	return string(nameBytes[:end])
 }
 
@@ -357,7 +355,7 @@ func D4Index(data *Data4, indexName string) *Index4 {
 
 	// TODO: Traverse data's index list to find matching name
 	// For now, attempt to open the index file
-	
+
 	return I4Open(data, indexName)
 }
 
@@ -369,7 +367,7 @@ func D4Tag(data *Data4, tagName string) *Tag4 {
 
 	// Convert to uppercase for comparison (like C implementation)
 	upperTagName := strings.ToUpper(tagName)
-	
+
 	// Search through all tags using d4tagNext pattern (like C d4tag function)
 	var tagOn *Tag4 = nil
 	for {
@@ -377,7 +375,7 @@ func D4Tag(data *Data4, tagName string) *Tag4 {
 		if tagOn == nil {
 			break
 		}
-		
+
 		// Compare tag alias (like C: strcmp( tagOn->tagFile->alias, tagLookup ) == 0)
 		if tagOn.TagFile != nil {
 			tagAlias := T4Alias(tagOn)
@@ -386,7 +384,7 @@ func D4Tag(data *Data4, tagName string) *Tag4 {
 			}
 		}
 	}
-	
+
 	// Not found - C implementation would set error based on data.codeBase.errTagName
 	return nil
 }
@@ -396,7 +394,7 @@ func I4FirstTag(index *Index4) *Tag4 {
 	if index == nil || index.IndexFile == nil {
 		return nil
 	}
-	
+
 	if index.IndexFile.Tags.NumLinks > 0 {
 		// Get the first tag from the linked list
 		firstTagLink := list4First(&index.IndexFile.Tags)
@@ -412,7 +410,7 @@ func I4FirstTag(index *Index4) *Tag4 {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -421,7 +419,7 @@ func I4NumTags(index *Index4) int {
 	if index == nil || index.IndexFile == nil {
 		return 0
 	}
-	
+
 	return int(index.IndexFile.Tags.NumLinks)
 }
 
@@ -430,7 +428,7 @@ func D4TagDefault(data *Data4) *Tag4 {
 	if data == nil {
 		return nil
 	}
-	
+
 	return data.TagSelected
 }
 
@@ -439,7 +437,7 @@ func D4TagSelect(data *Data4, tag *Tag4) {
 	if data == nil {
 		return
 	}
-	
+
 	data.TagSelected = tag
 }
 
@@ -448,7 +446,7 @@ func D4TagSelected(data *Data4) *Tag4 {
 	if data == nil {
 		return nil
 	}
-	
+
 	return data.TagSelected
 }
 
@@ -457,7 +455,7 @@ func T4Name(tag *Tag4) string {
 	if tag == nil || tag.TagFile == nil {
 		return ""
 	}
-	
+
 	return string(tag.TagFile.Alias[:])
 }
 
@@ -474,7 +472,7 @@ func T4Expr(tag *Tag4) string {
 		// read the expression from the CDX file at the specified position
 		return "<expression>" // Simplified
 	}
-	
+
 	return ""
 }
 
@@ -483,7 +481,7 @@ func T4KeyLen(tag *Tag4) int16 {
 	if tag == nil || tag.TagFile == nil {
 		return 0
 	}
-	
+
 	return tag.TagFile.Header.KeyLen
 }
 
@@ -492,7 +490,7 @@ func T4Unique(tag *Tag4) bool {
 	if tag == nil || tag.TagFile == nil {
 		return false
 	}
-	
+
 	return (tag.TagFile.Header.TypeCode & CDXTypeUnique) != 0
 }
 
@@ -501,7 +499,7 @@ func T4Descending(tag *Tag4) bool {
 	if tag == nil || tag.TagFile == nil {
 		return false
 	}
-	
+
 	return tag.TagFile.Header.Descending != 0
 }
 
@@ -510,10 +508,10 @@ func D4TagNext(data *Data4, tag *Tag4) *Tag4 {
 	if data == nil {
 		return nil
 	}
-	
+
 	var i4 *Index4
 	var tagOn *Tag4 = tag
-	
+
 	if tagOn == nil {
 		// Get first index
 		i4 = indexFromLink(list4First(&data.Indexes))
@@ -539,7 +537,7 @@ func D4TagNext(data *Data4, tag *Tag4) *Tag4 {
 			return nil
 		}
 	}
-	
+
 	// Get next tag in current index
 	if i4.IndexFile != nil {
 		var nextTagLink *Link4
@@ -551,7 +549,7 @@ func D4TagNext(data *Data4, tag *Tag4) *Tag4 {
 			currentTagLink := &tagOn.TagFile.Link
 			nextTagLink = list4Next(&i4.IndexFile.Tags, currentTagLink)
 		}
-		
+
 		if nextTagLink != nil && nextTagLink != list4First(&i4.IndexFile.Tags) {
 			// Found next tag in current index
 			tagFile := tagFileFromLink(nextTagLink)
@@ -587,7 +585,7 @@ func D4TagNext(data *Data4, tag *Tag4) *Tag4 {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -598,7 +596,6 @@ func T4Alias(tag *Tag4) string {
 	}
 	return getTagName(tag.TagFile.Alias[:])
 }
-
 
 // T4ExprSource returns tag expression source (mirrors t4exprSource)
 func T4ExprSource(tag *Tag4) string {
@@ -630,7 +627,7 @@ func getTags(index *Index4) []*Tag4 {
 	if index.IndexFile == nil {
 		return tags
 	}
-	
+
 	link := index.IndexFile.Tags.LastNode
 	for link != nil {
 		tagFile := (*Tag4File)(unsafe.Pointer(link))
@@ -668,18 +665,18 @@ func D4Seek(data *Data4, seekValue string) int {
 
 	// Perform B+ tree seek
 	seekResult, recNo := b4Seek(tag, seekValue)
-	
+
 	switch seekResult {
 	case R4Success:
 		// Exact match found
 		data.lastSeekFound = true
 		return D4GoPosition(data, recNo)
-		
+
 	case R4Found:
 		// Key found (for duplicate handling)
-		data.lastSeekFound = true 
+		data.lastSeekFound = true
 		return D4GoPosition(data, recNo)
-		
+
 	case R4After:
 		// Position after the seek value
 		data.lastSeekFound = false
@@ -687,13 +684,13 @@ func D4Seek(data *Data4, seekValue string) int {
 			return D4GoPosition(data, recNo)
 		}
 		return R4After
-		
+
 	case R4Eof:
 		// Past end of file
 		data.lastSeekFound = false
 		data.atEof = true
 		return R4Eof
-		
+
 	default:
 		data.lastSeekFound = false
 		return seekResult
@@ -709,7 +706,7 @@ func D4SeekDouble(data *Data4, seekValue float64) int {
 	// Format the double value to match the key format
 	// Visual FoxPro numeric keys are typically right-aligned with spaces
 	seekStr := fmt.Sprintf("%*.2f", data.TagSelected.TagFile.Header.KeyLen, seekValue)
-	
+
 	return D4Seek(data, seekStr)
 }
 
@@ -718,12 +715,12 @@ func D4SeekN(data *Data4, seekValue string, length int16) int {
 	if data == nil || data.TagSelected == nil || length <= 0 {
 		return ErrorMemory
 	}
-	
+
 	// Truncate seek value to specified length
 	if len(seekValue) > int(length) {
 		seekValue = seekValue[:length]
 	}
-	
+
 	return D4Seek(data, seekValue)
 }
 
@@ -769,7 +766,7 @@ func autoOpenProductionIndex(data *Data4) int {
 			data.TagSelected = firstTag
 		}
 	}
-	
+
 	return ErrorNone
 }
 
@@ -796,7 +793,7 @@ func b4Seek(tag *Tag4, seekValue string) (int, int32) {
 
 		// Search within the block
 		keyIndex, found := b4SearchBlock(block, seekValue)
-		
+
 		// If this is a leaf block
 		if block.BlockType == 0x00 { // Leaf block
 			if found {
@@ -828,7 +825,7 @@ func b4ReadBlock(indexFile *Index4File, blockNo int32, keyLen int16) (*B4Block, 
 
 	// Calculate file position (blocks are 512 bytes)
 	filePos := int64(blockNo) * CDXBlockSize
-	
+
 	// Read block data
 	blockData := make([]byte, CDXBlockSize)
 	bytesRead := File4Read(&indexFile.File, filePos, blockData, CDXBlockSize)
@@ -852,15 +849,15 @@ func b4ReadBlock(indexFile *Index4File, blockNo int32, keyLen int16) (*B4Block, 
 			offset := 4 // Start after header
 			for i := int16(0); i < block.NumKeys; i++ {
 				key := &block.Keys[i]
-				
+
 				// Extract key data (format depends on key type)
 				key.KeyData = make([]byte, keyLen)
 				copy(key.KeyData, blockData[offset:offset+int(keyLen)])
 				offset += int(keyLen)
-				
+
 				// Extract record number (4 bytes)
 				if offset+4 <= len(blockData) {
-					key.RecNo = int32(binary.LittleEndian.Uint32(blockData[offset:offset+4]))
+					key.RecNo = int32(binary.LittleEndian.Uint32(blockData[offset : offset+4]))
 					offset += 4
 				}
 			}
@@ -868,21 +865,21 @@ func b4ReadBlock(indexFile *Index4File, blockNo int32, keyLen int16) (*B4Block, 
 			// Branch blocks have pointers to child blocks
 			block.Pointers = make([]int32, block.NumKeys+1)
 			offset := 4
-			
+
 			// First pointer
-			block.Pointers[0] = int32(binary.LittleEndian.Uint32(blockData[offset:offset+4]))
+			block.Pointers[0] = int32(binary.LittleEndian.Uint32(blockData[offset : offset+4]))
 			offset += 4
-			
+
 			// Keys and pointers
 			for i := int16(0); i < block.NumKeys; i++ {
 				key := &block.Keys[i]
 				key.KeyData = make([]byte, keyLen)
 				copy(key.KeyData, blockData[offset:offset+int(keyLen)])
 				offset += int(keyLen)
-				
+
 				// Pointer to next child
 				if offset+4 <= len(blockData) {
-					block.Pointers[i+1] = int32(binary.LittleEndian.Uint32(blockData[offset:offset+4]))
+					block.Pointers[i+1] = int32(binary.LittleEndian.Uint32(blockData[offset : offset+4]))
 					offset += 4
 				}
 			}
@@ -901,11 +898,11 @@ func b4SearchBlock(block *B4Block, seekValue string) (int, bool) {
 	// Binary search within the block
 	left := 0
 	right := len(block.Keys) - 1
-	
+
 	for left <= right {
 		mid := (left + right) / 2
 		keyValue := strings.TrimSpace(string(block.Keys[mid].KeyData))
-		
+
 		cmp := strings.Compare(seekValue, keyValue)
 		if cmp == 0 {
 			return mid, true // Exact match
@@ -915,7 +912,7 @@ func b4SearchBlock(block *B4Block, seekValue string) (int, bool) {
 			left = mid + 1
 		}
 	}
-	
+
 	// Return insertion point
 	return left, false
 }
@@ -948,7 +945,7 @@ func D4SeekNextDouble(data *Data4, seekValue float64) int {
 	// Check current position and key value
 	currentKey := d4getCurrentKey(data)
 	seekStr := fmt.Sprintf("%*.2f", data.TagSelected.TagFile.Header.KeyLen, seekValue)
-	
+
 	// If we're already on a matching key, skip to the next occurrence
 	if strings.TrimSpace(currentKey) == strings.TrimSpace(seekStr) {
 		// Skip to next record in index order
@@ -956,7 +953,7 @@ func D4SeekNextDouble(data *Data4, seekValue float64) int {
 		if err != ErrorNone {
 			return err
 		}
-		
+
 		// Check if we're still on a matching key
 		newKey := d4getCurrentKey(data)
 		if strings.TrimSpace(newKey) == strings.TrimSpace(seekStr) {
@@ -964,7 +961,7 @@ func D4SeekNextDouble(data *Data4, seekValue float64) int {
 		}
 		return R4After // Moved past the matching keys
 	}
-	
+
 	// Otherwise, perform regular seek
 	return D4SeekDouble(data, seekValue)
 }
@@ -1010,13 +1007,13 @@ func D4SeekNextN(data *Data4, seekValue string, length int16) int {
 		if err != ErrorNone {
 			return err
 		}
-		
+
 		// Check if the new position still matches
 		newKey := d4getCurrentKey(data)
 		if len(newKey) > seekLen {
 			newKey = newKey[:seekLen]
 		}
-		
+
 		if strings.EqualFold(strings.TrimSpace(newKey), strings.TrimSpace(truncatedSeek)) {
 			data.lastSeekFound = true
 			return R4Success
@@ -1136,64 +1133,64 @@ func i4createCdxHeader(indexFile *Index4File, tagInfo []Tag4Info) int {
 	// CDX files start with tag descriptors, not a global header
 	// Write initial tag directory (512 bytes)
 	headerBuf := make([]byte, CDXHeaderSize)
-	
+
 	// Initialize tag directory with zeros
 	memset(headerBuf, 0, CDXHeaderSize)
-	
+
 	// Write the header block
 	bytesWritten := File4Write(&indexFile.File, 0, headerBuf, CDXHeaderSize)
 	if bytesWritten != CDXHeaderSize {
 		return ErrorWrite
 	}
-	
+
 	return ErrorNone
 }
 
 // i4createTags creates tag structures for the new index
 func i4createTags(indexFile *Index4File, data *Data4, tagInfo []Tag4Info) int {
 	var tags []*Tag4
-	
+
 	// Process each tag
 	for i, info := range tagInfo {
 		if info.Name == "" || info.Expression == "" {
 			continue
 		}
-		
+
 		// Create TAG4FILE structure
 		tagFile := &Tag4File{
-			CodeBase:   indexFile.CodeBase,
-			IndexFile:  indexFile,
+			CodeBase:  indexFile.CodeBase,
+			IndexFile: indexFile,
 		}
-		
+
 		// Set tag name
 		copy(tagFile.Alias[:], strings.ToUpper(info.Name))
-		
+
 		// Parse expression (simplified for now)
 		tagFile.ExprSource = info.Expression
 		if info.Filter != "" {
 			tagFile.FilterSource = info.Filter
 		}
-		
+
 		// Set up basic header
 		tagFile.Header = CdxHeader{
 			Root:      int32(1 + i), // Temporary root block assignment
 			Signature: CDXSignature,
 			TypeCode:  CDXTypeCompact,
 		}
-		
+
 		// Handle unique flag
 		if info.Unique != 0 {
 			tagFile.Header.TypeCode |= CDXTypeUnique
 		}
-		
+
 		// Handle descending flag
 		if info.Descending != 0 {
 			tagFile.Header.Descending = 1
 		}
-		
+
 		// Determine key length and type (simplified)
 		tagFile.Header.KeyLen = i4calculateKeyLength(info.Expression, data)
-		
+
 		// Create TAG4 wrapper
 		tag := &Tag4{
 			TagFile:   tagFile,
@@ -1201,12 +1198,12 @@ func i4createTags(indexFile *Index4File, data *Data4, tagInfo []Tag4Info) int {
 			ErrUnique: 0,
 			IsValid:   true,
 		}
-		
+
 		// Add to lists
 		list4Add(&indexFile.Tags, &tagFile.Link)
 		tags = append(tags, tag)
 	}
-	
+
 	// Write tag descriptors to file
 	return i4writeTagDescriptors(indexFile, tags)
 }
@@ -1216,7 +1213,7 @@ func i4calculateKeyLength(expression string, data *Data4) int16 {
 	// Simplified key length calculation
 	// In a full implementation, this would parse the expression
 	// and determine the actual key length based on field types
-	
+
 	// For now, return a default length based on common patterns
 	if strings.Contains(strings.ToUpper(expression), "STR(") {
 		return 10 // Numeric to string conversion
@@ -1232,7 +1229,7 @@ func i4calculateKeyLength(expression string, data *Data4) int16 {
 			}
 		}
 	}
-	
+
 	return 10 // Default key length
 }
 
@@ -1244,23 +1241,23 @@ func i4writeTagDescriptors(indexFile *Index4File, tags []*Tag4) int {
 	if bytesRead != CDXHeaderSize {
 		return ErrorRead
 	}
-	
+
 	// Write tag descriptors (32 bytes each)
 	for i, tag := range tags {
 		if i >= CDXMaxTags {
 			break // Too many tags
 		}
-		
+
 		offset := i * CDXTagDescSize
 		tagData := headerBuf[offset : offset+CDXTagDescSize]
-		
+
 		// Clear the descriptor
 		memset(tagData, 0, CDXTagDescSize)
-		
+
 		// FoxPro CDX tag descriptor format:
 		// 0-3: Root block number (4 bytes)
 		binary.LittleEndian.PutUint32(tagData[0:4], uint32(tag.TagFile.Header.Root))
-		
+
 		// 4-15: Tag name (12 bytes, null-terminated)
 		tagName := string(tag.TagFile.Alias[:])
 		tagName = strings.TrimSpace(tagName)
@@ -1268,13 +1265,13 @@ func i4writeTagDescriptors(indexFile *Index4File, tags []*Tag4) int {
 			tagName = tagName[:11]
 		}
 		copy(tagData[4:16], tagName)
-		
+
 		// 16-17: Key length (2 bytes)
 		binary.LittleEndian.PutUint16(tagData[16:18], uint16(tag.TagFile.Header.KeyLen))
-		
+
 		// 18: Key type (1 byte)
 		tagData[18] = tag.TagFile.Header.TypeCode
-		
+
 		// 19: Options (1 byte)
 		options := uint8(0)
 		if (tag.TagFile.Header.TypeCode & CDXTypeUnique) != 0 {
@@ -1284,17 +1281,17 @@ func i4writeTagDescriptors(indexFile *Index4File, tags []*Tag4) int {
 			options |= 0x08 // Descending flag
 		}
 		tagData[19] = options
-		
+
 		// 20-31: Reserved/sibling pointers (set to 0 for now)
 		// These would be used for tag chaining in complex scenarios
 	}
-	
+
 	// Write the updated header back to file
 	bytesWritten := File4Write(&indexFile.File, 0, headerBuf, CDXHeaderSize)
 	if bytesWritten != CDXHeaderSize {
 		return ErrorWrite
 	}
-	
+
 	return ErrorNone
 }
 
@@ -1346,14 +1343,14 @@ func I4Reindex(index *Index4) int {
 				ErrUnique: 0,
 				IsValid:   true,
 			}
-			
+
 			// Reindex this tag
 			rc := t4reindex(tag)
 			if rc != ErrorNone {
 				return rc
 			}
 		}
-		
+
 		// Move to next tag
 		current = list4Next(&index.IndexFile.Tags, current)
 		if current == list4First(&index.IndexFile.Tags) {
@@ -1365,7 +1362,7 @@ func I4Reindex(index *Index4) int {
 	data.recNo = -1
 	data.atBof = true
 	data.atEof = false
-	
+
 	return ErrorNone
 }
 
@@ -1376,7 +1373,7 @@ func t4reindex(tag *Tag4) int {
 	}
 
 	data := tag.Index.Data
-	
+
 	if data == nil {
 		return ErrorMemory
 	}
@@ -1407,13 +1404,13 @@ func t4reindexClear(tagFile *Tag4File) int {
 	// Reset tag header to initial state
 	tagFile.Header.Root = 1 // Will be updated during rebuild
 	tagFile.Header.FreeList = 0
-	
+
 	// In a full implementation, this would:
 	// 1. Mark all existing blocks as free
 	// 2. Reset block allocation counters
 	// 3. Clear any cached block data
 	// For now, we'll do a simplified clear
-	
+
 	return ErrorNone
 }
 
@@ -1489,7 +1486,7 @@ type IndexKey struct {
 	RecNo   int32
 }
 
-// t4sortKeys sorts index keys 
+// t4sortKeys sorts index keys
 func t4sortKeys(keys []IndexKey, descending bool) {
 	// Simple string-based sort
 	// In a full implementation, this would use proper collation
@@ -1592,7 +1589,7 @@ func d4seekNextSkip(data *Data4) int {
 	// In a full implementation, this would navigate through the B+ tree
 	// For now, we'll use a simplified approach by skipping in the database
 	// and checking if we're still in index order
-	
+
 	// Skip to next record
 	err := D4Skip(data, 1)
 	if err != ErrorNone {
@@ -1686,24 +1683,24 @@ func b4leafSeek(block *B4Block, searchValue string, length int) int {
 	for keyIndex := 0; keyIndex < len(block.Keys); keyIndex++ {
 		key := &block.Keys[keyIndex]
 		keyData := string(key.KeyData)
-		
+
 		// Calculate significant bytes in the key (excluding trailing spaces)
 		significantBytes := len(strings.TrimRight(keyData, " "))
-		
+
 		// Handle all-blank search specifically
 		if allBlank && significantBytes == 0 {
 			return keyIndex // Found blank key
 		}
-		
+
 		// Determine comparison length
 		compareLen := effectiveLen
 		if significantBytes < compareLen {
 			compareLen = significantBytes
 		}
-		
+
 		// Perform key comparison
 		result := b4compareKeyData(keyData, searchValue, compareLen)
-		
+
 		if result == 0 {
 			// Keys match so far, check if this is exact match
 			if compareLen == effectiveLen {
@@ -1793,7 +1790,7 @@ func b4calculateDuplicatePrefix(key1, key2 []byte) int {
 func formatNumericKey(value float64, keyLen int) string {
 	// VFP numeric keys are stored as strings with specific formatting
 	// Negative numbers have a special encoding
-	
+
 	if value < 0 {
 		// Negative numbers: invert sign and complement digits
 		absValue := -value
@@ -1828,7 +1825,7 @@ func formatDateKey(dateStr string, keyLen int) string {
 		}
 		return fmt.Sprintf("%-*s", keyLen, formatted)
 	}
-	
+
 	// Invalid date, pad with spaces
 	return fmt.Sprintf("%-*s", keyLen, dateStr)
 }
@@ -1841,7 +1838,7 @@ func formatStringKey(value string, keyLen int, descending bool) string {
 		formatted = formatted[:keyLen]
 	}
 	result := fmt.Sprintf("%-*s", keyLen, formatted)
-	
+
 	if descending {
 		// For descending keys, complement the characters
 		bytes := []byte(result)
@@ -1850,7 +1847,7 @@ func formatStringKey(value string, keyLen int, descending bool) string {
 		}
 		return string(bytes)
 	}
-	
+
 	return result
 }
 
@@ -1861,7 +1858,7 @@ func compareKeys(key1, key2 []byte, keyType int, collation int) int {
 	if len(key2) < minLen {
 		minLen = len(key2)
 	}
-	
+
 	switch keyType {
 	case int(FieldTypeNumeric), int(FieldTypeFloat), int(FieldTypeCurrency):
 		return compareNumericKeys(key1, key2, minLen)
@@ -1884,14 +1881,14 @@ func compareNumericKeys(key1, key2 []byte, length int) int {
 			return 1
 		}
 	}
-	
+
 	// Handle length differences
 	if len(key1) < len(key2) {
 		return -1
 	} else if len(key1) > len(key2) {
 		return 1
 	}
-	
+
 	return 0
 }
 
@@ -1914,7 +1911,7 @@ func compareLogicalKeys(key1, key2 []byte, length int) int {
 	if length > 0 {
 		val1 := key1[0]
 		val2 := key2[0]
-		
+
 		// Normalize to T/F
 		if val1 == 'Y' || val1 == 'y' || val1 == '1' {
 			val1 = 'T'
@@ -1926,7 +1923,7 @@ func compareLogicalKeys(key1, key2 []byte, length int) int {
 		} else {
 			val2 = 'F'
 		}
-		
+
 		if val1 < val2 {
 			return -1
 		} else if val1 > val2 {
@@ -1964,14 +1961,14 @@ func compareGeneralKeys(key1, key2 []byte, length int) int {
 		// Convert to uppercase for comparison
 		c1 := key1[i]
 		c2 := key2[i]
-		
+
 		if c1 >= 'a' && c1 <= 'z' {
 			c1 = c1 - 'a' + 'A'
 		}
 		if c2 >= 'a' && c2 <= 'z' {
 			c2 = c2 - 'a' + 'A'
 		}
-		
+
 		if c1 < c2 {
 			return -1
 		} else if c1 > c2 {
@@ -1991,28 +1988,28 @@ func evaluateIndexExpression(tagFile *Tag4File, data *Data4, expression string) 
 	if field := D4Field(data, strings.ToUpper(expression)); field != nil {
 		fieldType := field.Type
 		keyLen := int(tagFile.Header.KeyLen)
-		
+
 		switch fieldType {
 		case int16(FieldTypeChar):
 			value := F4Str(field)
 			formatted := formatStringKey(value, keyLen, tagFile.Header.Descending != 0)
 			return []byte(formatted), int(FieldTypeChar)
-			
+
 		case int16(FieldTypeNumeric), int16(FieldTypeFloat):
 			value := F4Double(field)
 			formatted := formatNumericKey(value, keyLen)
 			return []byte(formatted), int(FieldTypeNumeric)
-			
+
 		case int16(FieldTypeDate):
 			value := F4Str(field)
 			formatted := formatDateKey(value, keyLen)
 			return []byte(formatted), int(FieldTypeDate)
-			
+
 		case int16(FieldTypeLogical):
 			value := F4Str(field)
 			formatted := fmt.Sprintf("%-*s", keyLen, value)
 			return []byte(formatted), int(FieldTypeLogical)
-			
+
 		default:
 			value := F4Str(field)
 			formatted := formatStringKey(value, keyLen, false)
@@ -2063,7 +2060,7 @@ func parseExpression(expression string) *ExpressionParser {
 		Tokens:     []ExprToken{},
 		Pos:        0,
 	}
-	
+
 	parser.tokenize()
 	return parser
 }
@@ -2072,16 +2069,16 @@ func parseExpression(expression string) *ExpressionParser {
 func (p *ExpressionParser) tokenize() {
 	expression := p.Expression
 	i := 0
-	
+
 	for i < len(expression) {
 		ch := expression[i]
-		
+
 		// Skip whitespace
 		if ch == ' ' || ch == '\t' {
 			i++
 			continue
 		}
-		
+
 		// Handle parentheses
 		if ch == '(' {
 			p.Tokens = append(p.Tokens, ExprToken{TokenLeftParen, "(", i})
@@ -2098,7 +2095,7 @@ func (p *ExpressionParser) tokenize() {
 			i++
 			continue
 		}
-		
+
 		// Handle string literals
 		if ch == '"' || ch == '\'' {
 			quote := ch
@@ -2113,26 +2110,26 @@ func (p *ExpressionParser) tokenize() {
 			i = j
 			continue
 		}
-		
+
 		// Handle operators
 		if ch == '+' || ch == '-' || ch == '*' || ch == '/' {
 			p.Tokens = append(p.Tokens, ExprToken{TokenOperator, string(ch), i})
 			i++
 			continue
 		}
-		
+
 		// Handle identifiers and functions
 		if (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '_' {
 			j := i
-			for j < len(expression) && ((expression[j] >= 'A' && expression[j] <= 'Z') || 
-				(expression[j] >= 'a' && expression[j] <= 'z') || 
-				(expression[j] >= '0' && expression[j] <= '9') || 
+			for j < len(expression) && ((expression[j] >= 'A' && expression[j] <= 'Z') ||
+				(expression[j] >= 'a' && expression[j] <= 'z') ||
+				(expression[j] >= '0' && expression[j] <= '9') ||
 				expression[j] == '_') {
 				j++
 			}
-			
+
 			identifier := expression[i:j]
-			
+
 			// Check if it's a function (followed by parenthesis)
 			if j < len(expression) && expression[j] == '(' {
 				p.Tokens = append(p.Tokens, ExprToken{TokenFunction, identifier, i})
@@ -2142,7 +2139,7 @@ func (p *ExpressionParser) tokenize() {
 			i = j
 			continue
 		}
-		
+
 		// Handle numbers
 		if (ch >= '0' && ch <= '9') || ch == '.' {
 			j := i
@@ -2153,11 +2150,11 @@ func (p *ExpressionParser) tokenize() {
 			i = j
 			continue
 		}
-		
+
 		// Skip unknown characters
 		i++
 	}
-	
+
 	p.Tokens = append(p.Tokens, ExprToken{TokenEOF, "", len(expression)})
 }
 
@@ -2166,7 +2163,7 @@ func evaluateVFPExpression(parser *ExpressionParser, tagFile *Tag4File, data *Da
 	if parser == nil || len(parser.Tokens) == 0 {
 		return nil, int(FieldTypeChar)
 	}
-	
+
 	// Handle simple cases first
 	if len(parser.Tokens) == 2 { // Field + EOF
 		token := parser.Tokens[0]
@@ -2174,7 +2171,7 @@ func evaluateVFPExpression(parser *ExpressionParser, tagFile *Tag4File, data *Da
 			return evaluateField(token.Value, tagFile, data)
 		}
 	}
-	
+
 	// Handle function calls
 	if len(parser.Tokens) >= 4 { // Function + ( + args + )
 		token := parser.Tokens[0]
@@ -2182,7 +2179,7 @@ func evaluateVFPExpression(parser *ExpressionParser, tagFile *Tag4File, data *Da
 			return evaluateFunction(token.Value, parser, tagFile, data)
 		}
 	}
-	
+
 	// Handle complex expressions (simplified)
 	return evaluateComplexExpression(parser, tagFile, data)
 }
@@ -2193,31 +2190,31 @@ func evaluateField(fieldName string, tagFile *Tag4File, data *Data4) ([]byte, in
 	if field == nil {
 		return nil, int(FieldTypeChar)
 	}
-	
+
 	fieldType := field.Type
 	keyLen := int(tagFile.Header.KeyLen)
-	
+
 	switch fieldType {
 	case int16(FieldTypeChar):
 		value := F4Str(field)
 		formatted := formatStringKey(value, keyLen, tagFile.Header.Descending != 0)
 		return []byte(formatted), int(FieldTypeChar)
-		
+
 	case int16(FieldTypeNumeric), int16(FieldTypeFloat):
 		value := F4Double(field)
 		formatted := formatNumericKey(value, keyLen)
 		return []byte(formatted), int(FieldTypeNumeric)
-		
+
 	case int16(FieldTypeDate):
 		value := F4Str(field)
 		formatted := formatDateKey(value, keyLen)
 		return []byte(formatted), int(FieldTypeDate)
-		
+
 	case int16(FieldTypeLogical):
 		value := F4Str(field)
 		formatted := fmt.Sprintf("%-*s", keyLen, value)
 		return []byte(formatted), int(FieldTypeLogical)
-		
+
 	default:
 		value := F4Str(field)
 		formatted := formatStringKey(value, keyLen, false)
@@ -2228,7 +2225,7 @@ func evaluateField(fieldName string, tagFile *Tag4File, data *Data4) ([]byte, in
 // evaluateFunction evaluates VFP functions like STR(), DTOS(), etc.
 func evaluateFunction(funcName string, parser *ExpressionParser, tagFile *Tag4File, data *Data4) ([]byte, int) {
 	keyLen := int(tagFile.Header.KeyLen)
-	
+
 	switch funcName {
 	case "STR":
 		// STR(numeric_field) - convert number to string
@@ -2242,7 +2239,7 @@ func evaluateFunction(funcName string, parser *ExpressionParser, tagFile *Tag4Fi
 				return []byte(formatted), int(FieldTypeChar)
 			}
 		}
-		
+
 	case "DTOS":
 		// DTOS(date_field) - convert date to YYYYMMDD string
 		if len(parser.Tokens) >= 4 && parser.Tokens[2].Type == TokenField {
@@ -2254,7 +2251,7 @@ func evaluateFunction(funcName string, parser *ExpressionParser, tagFile *Tag4Fi
 				return []byte(formatted), int(FieldTypeChar)
 			}
 		}
-		
+
 	case "UPPER":
 		// UPPER(field) - convert to uppercase
 		if len(parser.Tokens) >= 4 && parser.Tokens[2].Type == TokenField {
@@ -2266,7 +2263,7 @@ func evaluateFunction(funcName string, parser *ExpressionParser, tagFile *Tag4Fi
 				return []byte(formatted), int(FieldTypeChar)
 			}
 		}
-		
+
 	case "LEFT":
 		// LEFT(field, n) - leftmost n characters
 		if len(parser.Tokens) >= 6 && parser.Tokens[2].Type == TokenField && parser.Tokens[4].Type == TokenLiteral {
@@ -2283,7 +2280,7 @@ func evaluateFunction(funcName string, parser *ExpressionParser, tagFile *Tag4Fi
 				return []byte(formatted), int(FieldTypeChar)
 			}
 		}
-		
+
 	case "ALLTRIM":
 		// ALLTRIM(field) - remove leading and trailing spaces
 		if len(parser.Tokens) >= 4 && parser.Tokens[2].Type == TokenField {
@@ -2296,7 +2293,7 @@ func evaluateFunction(funcName string, parser *ExpressionParser, tagFile *Tag4Fi
 			}
 		}
 	}
-	
+
 	// Default: return empty key
 	formatted := formatStringKey("", keyLen, false)
 	return []byte(formatted), int(FieldTypeChar)
@@ -2306,17 +2303,17 @@ func evaluateFunction(funcName string, parser *ExpressionParser, tagFile *Tag4Fi
 func evaluateComplexExpression(parser *ExpressionParser, tagFile *Tag4File, data *Data4) ([]byte, int) {
 	// For now, implement simple concatenation with + operator
 	keyLen := int(tagFile.Header.KeyLen)
-	
+
 	if len(parser.Tokens) >= 5 { // field + op + field/literal + ...
 		leftToken := parser.Tokens[0]
 		operator := parser.Tokens[1]
 		rightToken := parser.Tokens[2]
-		
+
 		if operator.Type == TokenOperator && operator.Value == "+" {
 			// String concatenation
 			leftValue := ""
 			rightValue := ""
-			
+
 			if leftToken.Type == TokenField {
 				if field := D4Field(data, leftToken.Value); field != nil {
 					leftValue = F4Str(field)
@@ -2324,7 +2321,7 @@ func evaluateComplexExpression(parser *ExpressionParser, tagFile *Tag4File, data
 			} else if leftToken.Type == TokenLiteral {
 				leftValue = strings.Trim(leftToken.Value, "\"'")
 			}
-			
+
 			if rightToken.Type == TokenField {
 				if field := D4Field(data, rightToken.Value); field != nil {
 					rightValue = F4Str(field)
@@ -2332,18 +2329,18 @@ func evaluateComplexExpression(parser *ExpressionParser, tagFile *Tag4File, data
 			} else if rightToken.Type == TokenLiteral {
 				rightValue = strings.Trim(rightToken.Value, "\"'")
 			}
-			
+
 			result := leftValue + rightValue
 			formatted := formatStringKey(result, keyLen, false)
 			return []byte(formatted), int(FieldTypeChar)
 		}
 	}
-	
+
 	// Fallback: treat as simple field or return empty
 	if len(parser.Tokens) > 0 && parser.Tokens[0].Type == TokenField {
 		return evaluateField(parser.Tokens[0].Value, tagFile, data)
 	}
-	
+
 	formatted := formatStringKey("", keyLen, false)
 	return []byte(formatted), int(FieldTypeChar)
 }
@@ -2353,10 +2350,10 @@ func evaluateIndexExpressionAdvanced(tagFile *Tag4File, data *Data4, expression 
 	if expression == "" || data == nil {
 		return nil, int(FieldTypeChar)
 	}
-	
+
 	// Parse the expression
 	parser := parseExpression(expression)
-	
+
 	// Evaluate the parsed expression
 	return evaluateVFPExpression(parser, tagFile, data)
 }
@@ -2487,7 +2484,7 @@ func b4insert(tagFile *Tag4File, keyData []byte, recNo int32) int {
 
 	// Insert key in sorted order within leaf
 	insertPos := b4findInsertPosition(leafBlock, keyData)
-	
+
 	// Check if block needs to split
 	if len(leafBlock.Keys) >= CDXMaxKeysPerBlock {
 		// Split the block
@@ -2499,7 +2496,7 @@ func b4insert(tagFile *Tag4File, keyData []byte, recNo int32) int {
 		// Insert into appropriate block
 		if insertPos <= len(leftBlock.Keys) {
 			// Insert into left block
-			leftBlock.Keys = append(leftBlock.Keys[:insertPos], 
+			leftBlock.Keys = append(leftBlock.Keys[:insertPos],
 				append([]B4Key{newKey}, leftBlock.Keys[insertPos:]...)...)
 		} else {
 			// Insert into right block
@@ -2511,7 +2508,7 @@ func b4insert(tagFile *Tag4File, keyData []byte, recNo int32) int {
 		// Write blocks to disk
 		leftBlockNum, _ := b4allocateBlock(tagFile.IndexFile)
 		rightBlockNum, _ := b4allocateBlock(tagFile.IndexFile)
-		
+
 		b4writeBlock(tagFile.IndexFile, leftBlockNum, leftBlock)
 		b4writeBlock(tagFile.IndexFile, rightBlockNum, rightBlock)
 
@@ -2609,7 +2606,7 @@ func b4merge(tagFile *Tag4File, leftBlock, rightBlock *B4Block, separatorKey []b
 	if leftBlock.BlockType != 1 && separatorKey != nil {
 		// Insert separator key between left and right keys
 		separator := B4Key{KeyData: separatorKey}
-		
+
 		// Reconstruct keys with separator
 		allKeys := make([]B4Key, len(leftBlock.Keys)+1+len(rightBlock.Keys))
 		copy(allKeys, leftBlock.Keys)
@@ -2658,7 +2655,7 @@ func b4allocateBlock(indexFile *Index4File) (int32, int) {
 	// This would need proper free space management
 	fileLen := File4Length(&indexFile.File)
 	nextBlock := int32((fileLen + CDXBlockSize - 1) / CDXBlockSize)
-	
+
 	return nextBlock, ErrorNone
 }
 
@@ -2798,7 +2795,7 @@ func b4insertIntoParent(tagFile *Tag4File, leftBlockNum int32, separatorKey []by
 	return ErrorNone
 }
 
-// Complete b4remove implementation  
+// Complete b4remove implementation
 func b4removeComplete(tagFile *Tag4File, keyData []byte, recNo int32) int {
 	if tagFile == nil || len(keyData) == 0 {
 		return ErrorMemory
@@ -2917,7 +2914,7 @@ func t4buildBranchLevels(tagFile *Tag4File, leafBlocks []*B4Block, blockNums []i
 
 			for j := i; j < end; j++ {
 				parentBlock.Pointers = append(parentBlock.Pointers, currentLevel[j])
-				
+
 				// Add separator key (first key of child block)
 				if j < end-1 && len(levelBlocks[j].Keys) > 0 {
 					parentBlock.Keys = append(parentBlock.Keys, B4Key{

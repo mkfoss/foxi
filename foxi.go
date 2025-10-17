@@ -5,7 +5,7 @@
 //   - Default: Uses pure Go implementation (gomkfdbf)
 //   - -tags foxicgo: Uses CGO implementation with mkfdbf C library
 //
-// The package offers comprehensive functionality for reading, writing, navigating, 
+// The package offers comprehensive functionality for reading, writing, navigating,
 // and manipulating DBF databases with support for indexes, field types, deleted records,
 // and expression filtering.
 //
@@ -394,12 +394,12 @@ func (f *Fields) ByName(name string) Field {
 	if f.indices == nil {
 		return nil
 	}
-	
+
 	index, exists := f.indices[name]
 	if !exists {
 		return nil
 	}
-	
+
 	return f.ByIndex(index)
 }
 
@@ -655,12 +655,12 @@ type Index interface {
 	Name() string
 	FileName() string
 	TagCount() int
-	
+
 	// Access
 	Tag(index int) Tag
 	TagByName(name string) Tag
 	Tags() []Tag
-	
+
 	// State
 	IsOpen() bool
 	IsProduction() bool
@@ -673,18 +673,18 @@ type Tag interface {
 	Expression() string
 	Filter() string
 	KeyLength() int
-	
+
 	// Attributes
 	IsUnique() bool
 	IsDescending() bool
 	IsSelected() bool
-	
+
 	// Operations
 	Seek(value interface{}) (SeekResult, error)
 	SeekString(value string) (SeekResult, error)
 	SeekDouble(value float64) (SeekResult, error)
 	SeekInt(value int) (SeekResult, error)
-	
+
 	// Navigation (when tag is selected)
 	First() error
 	Last() error
@@ -692,7 +692,7 @@ type Tag interface {
 	Previous() error
 	Position() float64
 	PositionSet(percent float64) error
-	
+
 	// Must variants for operations - panic instead of returning errors
 	MustSeek(value interface{}) SeekResult
 	MustSeekString(value string) SeekResult
@@ -703,7 +703,7 @@ type Tag interface {
 	MustNext()
 	MustPrevious()
 	MustPositionSet(percent float64)
-	
+
 	// Current state
 	CurrentKey() string
 	RecordNumber() int

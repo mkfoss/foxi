@@ -143,8 +143,8 @@ func (c *cgoImpl) Header() Header {
 
 	header := Header{
 		recordCount: recordCount,
-		hasIndex:    false, // Will be detected based on actual indexes
-		hasFpt:      false, // Will be detected based on memo fields
+		hasIndex:    false,          // Will be detected based on actual indexes
+		hasFpt:      false,          // Will be detected based on memo fields
 		codepage:    Codepage(0x03), // Default to Windows ANSI
 	}
 
@@ -213,7 +213,7 @@ func (c *cgoImpl) Goto(recordNumber int) error {
 	if c.data == nil {
 		return fmt.Errorf("database not open")
 	}
-	
+
 	result := C.d4go(c.data, C.long(recordNumber))
 	if result != 0 {
 		return fmt.Errorf("failed to goto record %d", recordNumber)
@@ -225,7 +225,7 @@ func (c *cgoImpl) First() error {
 	if c.data == nil {
 		return fmt.Errorf("database not open")
 	}
-	
+
 	result := C.d4top(c.data)
 	if result != 0 {
 		return fmt.Errorf("failed to go to first record")
@@ -237,7 +237,7 @@ func (c *cgoImpl) Last() error {
 	if c.data == nil {
 		return fmt.Errorf("database not open")
 	}
-	
+
 	result := C.d4bottom(c.data)
 	if result != 0 {
 		return fmt.Errorf("failed to go to last record")
@@ -249,7 +249,7 @@ func (c *cgoImpl) Next() error {
 	if c.data == nil {
 		return fmt.Errorf("database not open")
 	}
-	
+
 	result := C.d4skip(c.data, 1)
 	if result != 0 {
 		return fmt.Errorf("failed to move to next record")
@@ -261,7 +261,7 @@ func (c *cgoImpl) Previous() error {
 	if c.data == nil {
 		return fmt.Errorf("database not open")
 	}
-	
+
 	result := C.d4skip(c.data, -1)
 	if result != 0 {
 		return fmt.Errorf("failed to move to previous record")
@@ -273,7 +273,7 @@ func (c *cgoImpl) Skip(count int) error {
 	if c.data == nil {
 		return fmt.Errorf("database not open")
 	}
-	
+
 	result := C.d4skip(c.data, C.long(count))
 	if result != 0 {
 		return fmt.Errorf("failed to skip %d records", count)
@@ -285,7 +285,7 @@ func (c *cgoImpl) Position() int {
 	if c.data == nil {
 		return 0
 	}
-	
+
 	return int(C.d4recNo(c.data))
 }
 
@@ -293,7 +293,7 @@ func (c *cgoImpl) EOF() bool {
 	if c.data == nil {
 		return true
 	}
-	
+
 	return C.d4eof(c.data) != 0
 }
 
@@ -301,7 +301,7 @@ func (c *cgoImpl) BOF() bool {
 	if c.data == nil {
 		return true
 	}
-	
+
 	return C.d4bof(c.data) != 0
 }
 
@@ -310,7 +310,7 @@ func (c *cgoImpl) Deleted() bool {
 	if c.data == nil {
 		return false
 	}
-	
+
 	return C.d4deleted(c.data) != 0
 }
 
@@ -318,7 +318,7 @@ func (c *cgoImpl) Delete() error {
 	if c.data == nil {
 		return fmt.Errorf("database not open")
 	}
-	
+
 	C.d4delete(c.data)
 	return nil
 }
@@ -327,7 +327,7 @@ func (c *cgoImpl) Recall() error {
 	if c.data == nil {
 		return fmt.Errorf("database not open")
 	}
-	
+
 	C.d4recall(c.data)
 	return nil
 }
@@ -378,9 +378,9 @@ func (c *cgoImpl) buildFields() error {
 			impl:   c,
 			cField: cField,
 		}
-		
+
 		fields[i] = field
-		
+
 		// Create case-insensitive name mapping
 		name := strings.ToLower(field.Name())
 		indices[name] = i
@@ -405,13 +405,13 @@ func (f *cgoField) Value() (interface{}, error) {
 	if f.impl.data == nil {
 		return nil, fmt.Errorf("database not open")
 	}
-	
+
 	// Get field value from current record using C library
 	fieldPtr := C.f4ptr(f.cField)
 	if fieldPtr == nil {
 		return nil, fmt.Errorf("failed to get field pointer")
 	}
-	
+
 	// Convert based on field type
 	fieldType := rune(f.cField._type)
 	switch fieldType {
@@ -435,12 +435,12 @@ func (f *cgoField) AsString() (string, error) {
 	if f.impl.data == nil {
 		return "", fmt.Errorf("database not open")
 	}
-	
+
 	fieldPtr := C.f4ptr(f.cField)
 	if fieldPtr == nil {
 		return "", fmt.Errorf("failed to get field pointer")
 	}
-	
+
 	return C.GoString((*C.char)(fieldPtr)), nil
 }
 
@@ -449,7 +449,7 @@ func (f *cgoField) AsInt() (int, error) {
 	if f.impl.data == nil {
 		return 0, fmt.Errorf("database not open")
 	}
-	
+
 	return int(C.f4long(f.cField)), nil
 }
 
@@ -458,7 +458,7 @@ func (f *cgoField) AsFloat() (float64, error) {
 	if f.impl.data == nil {
 		return 0, fmt.Errorf("database not open")
 	}
-	
+
 	return float64(C.f4double(f.cField)), nil
 }
 
@@ -467,7 +467,7 @@ func (f *cgoField) AsBool() (bool, error) {
 	if f.impl.data == nil {
 		return false, fmt.Errorf("database not open")
 	}
-	
+
 	return C.f4true(f.cField) != 0, nil
 }
 
@@ -476,18 +476,18 @@ func (f *cgoField) AsTime() (time.Time, error) {
 	if f.impl.data == nil {
 		return time.Time{}, fmt.Errorf("database not open")
 	}
-	
+
 	// Convert from C date format
 	fieldPtr := C.f4ptr(f.cField)
 	if fieldPtr == nil {
 		return time.Time{}, fmt.Errorf("failed to get field pointer")
 	}
-	
+
 	dateStr := C.GoString((*C.char)(fieldPtr))
 	if len(dateStr) != 8 {
 		return time.Time{}, fmt.Errorf("invalid date format")
 	}
-	
+
 	return time.Parse("20060102", dateStr)
 }
 
@@ -496,7 +496,7 @@ func (f *cgoField) IsNull() (bool, error) {
 	if f.impl.data == nil {
 		return false, fmt.Errorf("database not open")
 	}
-	
+
 	// Check for null using C library
 	return C.f4null(f.cField) != 0, nil
 }
@@ -676,11 +676,11 @@ func (idx *cgoIndexesImpl) Load() error {
 		if dbfFileName != "" {
 			baseName := strings.TrimSuffix(dbfFileName, ".dbf")
 			cdxFileName := baseName + ".cdx"
-			
+
 			// Convert to C string
 			cCdxFileName := C.CString(cdxFileName)
 			defer C.free(unsafe.Pointer(cCdxFileName))
-			
+
 			// Attempt to open the production index
 			index4 := C.i4open(idx.data, cCdxFileName)
 			if index4 != nil {
@@ -690,7 +690,7 @@ func (idx *cgoIndexesImpl) Load() error {
 					isProduction: true,
 				}
 				indexes = append(indexes, index)
-				
+
 				// Load tags from this index
 				indexTags := index.Tags()
 				allTags = append(allTags, indexTags...)
@@ -756,12 +756,12 @@ func (idx *cgoIndexesImpl) SelectedTag() Tag {
 	if idx.data == nil {
 		return nil
 	}
-	
+
 	selectedTag := C.d4tag(idx.data, nil) // Get current tag
 	if selectedTag == nil {
 		return nil
 	}
-	
+
 	// Find the matching foxi tag
 	for _, tag := range idx.tags {
 		if cgoTag, ok := tag.(*cgoTag); ok {
@@ -770,7 +770,7 @@ func (idx *cgoIndexesImpl) SelectedTag() Tag {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -779,18 +779,18 @@ func (idx *cgoIndexesImpl) SelectTag(tag Tag) error {
 	if idx.data == nil {
 		return fmt.Errorf("database not open")
 	}
-	
+
 	if tag == nil {
 		// Select natural order (no index)
 		C.d4tagSelect(idx.data, nil)
 		return nil
 	}
-	
+
 	if cgoTag, ok := tag.(*cgoTag); ok {
 		C.d4tagSelect(idx.data, cgoTag.tag4)
 		return nil
 	}
-	
+
 	return fmt.Errorf("invalid tag type")
 }
 
@@ -899,7 +899,7 @@ func (idx *cgoIndex) loadTags() {
 			index: idx,
 		}
 		tags = append(tags, tag)
-		
+
 		// Get next tag (this is a simplified approach)
 		// In reality, we'd need to iterate through the tag list properly
 		break // For now, just get the first one
@@ -1202,7 +1202,7 @@ func (tag *cgoTag) BOF() bool {
 		return true
 	}
 
-	// Ensure this tag is selected  
+	// Ensure this tag is selected
 	currentTag := C.d4tag(tag.data, nil)
 	if currentTag != tag.tag4 {
 		C.d4tagSelect(tag.data, tag.tag4)

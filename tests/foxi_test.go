@@ -99,7 +99,7 @@ func TestDoubleOpen(t *testing.T) {
 	err1 := f.Open("first_nonexistent.dbf")
 	if err1 == nil {
 		defer f.Close()
-		
+
 		// Try to open another file while one is already open
 		err2 := f.Open("second_nonexistent.dbf")
 		if err2 == nil {
@@ -213,7 +213,7 @@ func BenchmarkNewFoxi(b *testing.B) {
 func BenchmarkBackendString(b *testing.B) {
 	f := foxi.NewFoxi()
 	backend := f.Backend()
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = backend.String()

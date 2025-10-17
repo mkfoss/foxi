@@ -40,11 +40,11 @@ func (p *pureGoImpl) Open(filename string) error {
 
 	// Initialize CODE4 structure
 	p.codeBase = &pkg.Code4{}
-	
+
 	// Set default configuration
 	p.codeBase.AutoOpen = true
 	p.codeBase.ErrOff = 0 // Show errors
-	
+
 	// Open the data file using gomkfdbf
 	p.data = pkg.D4Open(p.codeBase, filename)
 	if p.data == nil {
@@ -98,8 +98,8 @@ func (p *pureGoImpl) Header() Header {
 
 	header := Header{
 		recordCount: uint(dataFile.Header.NumRecs),
-		hasIndex:    false, // Will be set based on actual index detection
-		hasFpt:      false, // Will be set based on memo field detection
+		hasIndex:    false,          // Will be set based on actual index detection
+		hasFpt:      false,          // Will be set based on memo field detection
 		codepage:    Codepage(0x03), // Default to Windows ANSI
 	}
 
@@ -110,10 +110,10 @@ func (p *pureGoImpl) Header() Header {
 	} else {
 		year += 1900
 	}
-	
+
 	month := int(dataFile.Header.Month)
 	day := int(dataFile.Header.Day)
-	
+
 	if month >= 1 && month <= 12 && day >= 1 && day <= 31 {
 		header.lastUpdated = time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
 	}
@@ -293,12 +293,12 @@ func (p *pureGoImpl) buildFields() error {
 	for i, gomkField := range p.data.Fields {
 		// Create foxi field wrapper
 		field := &pureGoField{
-			impl:     p,
+			impl:      p,
 			gomkField: gomkField,
 		}
-		
+
 		fields[i] = field
-		
+
 		// Create case-insensitive name mapping
 		name := strings.ToLower(string(gomkField.Name[:]))
 		name = strings.TrimRight(name, "\x00") // Remove null terminators
@@ -324,7 +324,7 @@ func (f *pureGoField) Value() (interface{}, error) {
 	if f.impl.data == nil {
 		return nil, fmt.Errorf("database not open")
 	}
-	
+
 	// Get field value based on type
 	switch rune(f.gomkField.Type) {
 	case 'C':
@@ -345,7 +345,7 @@ func (f *pureGoField) AsString() (string, error) {
 	if f.impl.data == nil {
 		return "", fmt.Errorf("database not open")
 	}
-	
+
 	return pkg.F4Str(f.gomkField), nil
 }
 
@@ -354,7 +354,7 @@ func (f *pureGoField) AsInt() (int, error) {
 	if f.impl.data == nil {
 		return 0, fmt.Errorf("database not open")
 	}
-	
+
 	return pkg.F4Int(f.gomkField), nil
 }
 
@@ -363,7 +363,7 @@ func (f *pureGoField) AsFloat() (float64, error) {
 	if f.impl.data == nil {
 		return 0, fmt.Errorf("database not open")
 	}
-	
+
 	return pkg.F4Double(f.gomkField), nil
 }
 
@@ -372,7 +372,7 @@ func (f *pureGoField) AsBool() (bool, error) {
 	if f.impl.data == nil {
 		return false, fmt.Errorf("database not open")
 	}
-	
+
 	return pkg.F4True(f.gomkField), nil
 }
 
@@ -381,13 +381,13 @@ func (f *pureGoField) AsTime() (time.Time, error) {
 	if f.impl.data == nil {
 		return time.Time{}, fmt.Errorf("database not open")
 	}
-	
+
 	// Convert from gomkfdbf date format
 	dateStr := pkg.F4Str(f.gomkField)
 	if len(dateStr) != 8 {
 		return time.Time{}, fmt.Errorf("invalid date format")
 	}
-	
+
 	return time.Parse("20060102", dateStr)
 }
 
@@ -396,13 +396,13 @@ func (f *pureGoField) IsNull() (bool, error) {
 	if f.impl.data == nil {
 		return false, fmt.Errorf("database not open")
 	}
-	
+
 	// Basic null checking - for now, check if field supports nulls
 	// and if the field content is all spaces or empty
 	if f.gomkField.Null == 0 {
 		return false, nil // Field doesn't support nulls
 	}
-	
+
 	// Check if field content is all spaces (DBF null representation)
 	value := pkg.F4Str(f.gomkField)
 	value = strings.TrimSpace(value)
@@ -584,7 +584,7 @@ func (idx *pureGoIndexesImpl) Load() error {
 	if dbfFileName != "" {
 		baseName := strings.TrimSuffix(dbfFileName, ".dbf")
 		cdxFileName := baseName + ".cdx"
-		
+
 		// Attempt to open the production index
 		index4 := pkg.I4Open(idx.data, cdxFileName)
 		if index4 != nil {
@@ -594,7 +594,7 @@ func (idx *pureGoIndexesImpl) Load() error {
 				isProduction: true,
 			}
 			indexes = append(indexes, index)
-			
+
 			// Load tags from this index
 			indexTags := index.Tags()
 			allTags = append(allTags, indexTags...)
@@ -659,12 +659,12 @@ func (idx *pureGoIndexesImpl) SelectedTag() Tag {
 	if idx.data == nil {
 		return nil
 	}
-	
+
 	selectedTag := pkg.D4TagSelected(idx.data)
 	if selectedTag == nil {
 		return nil
 	}
-	
+
 	// Find the matching foxi tag
 	for _, tag := range idx.tags {
 		if pureTag, ok := tag.(*pureGoTag); ok {
@@ -673,7 +673,7 @@ func (idx *pureGoIndexesImpl) SelectedTag() Tag {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -682,18 +682,18 @@ func (idx *pureGoIndexesImpl) SelectTag(tag Tag) error {
 	if idx.data == nil {
 		return fmt.Errorf("database not open")
 	}
-	
+
 	if tag == nil {
 		// Select natural order (no index)
 		pkg.D4TagSelect(idx.data, nil)
 		return nil
 	}
-	
+
 	if pureTag, ok := tag.(*pureGoTag); ok {
 		pkg.D4TagSelect(idx.data, pureTag.tag4)
 		return nil
 	}
-	
+
 	return fmt.Errorf("invalid tag type")
 }
 
@@ -791,7 +791,7 @@ func (idx *pureGoIndex) loadTags() {
 		if tag4 == nil {
 			break
 		}
-		
+
 		// Check if this tag belongs to our index
 		if tag4.Index == idx.index4 {
 			tag := &pureGoTag{
@@ -1073,7 +1073,7 @@ func (tag *pureGoTag) BOF() bool {
 		return true
 	}
 
-	// Ensure this tag is selected  
+	// Ensure this tag is selected
 	if pkg.D4TagSelected(tag.data) != tag.tag4 {
 		pkg.D4TagSelect(tag.data, tag.tag4)
 	}

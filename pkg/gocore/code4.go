@@ -28,7 +28,7 @@ func Code4Init(cb *Code4) int {
 	// Initialize with defaults matching C library
 	cb.AutoOpen = true
 	cb.CreateTemp = false
-	cb.ErrDefaultUnique = 0  // r4unique equivalent
+	cb.ErrDefaultUnique = 0 // r4unique equivalent
 	cb.ErrExpr = 1
 	cb.ErrFieldName = 1
 	cb.ErrOff = 1
@@ -36,12 +36,12 @@ func Code4Init(cb *Code4) int {
 	cb.Log = 0
 	cb.MemExpandData = 512
 	cb.MemSizeBuffer = 8192
-	cb.MemSizeSortBuffer = 8192 
+	cb.MemSizeSortBuffer = 8192
 	cb.MemSizeSortPool = 8192
 	cb.MemStartData = 2048
 	cb.Safety = 1
 	cb.Timeout = 0
-	cb.Compatibility = 30  // VFP 3.0 compatibility
+	cb.Compatibility = 30 // VFP 3.0 compatibility
 
 	// Internal initialization
 	cb.Initialized = true
@@ -49,9 +49,9 @@ func Code4Init(cb *Code4) int {
 	cb.Decimals = 2
 	cb.ErrorCode = ErrorNone
 	cb.FieldBuffer = make([]byte, 1024)
-	copy(cb.IndexExtension[:], "CDX")  // Default to CDX for FoxPro
+	copy(cb.IndexExtension[:], "CDX") // Default to CDX for FoxPro
 	cb.CollatingSequence = 0
-	cb.CodePage = 1252  // Windows ANSI
+	cb.CodePage = 1252 // Windows ANSI
 
 	// Initialize lists
 	cb.DataFileList = List4{}
@@ -74,7 +74,7 @@ func Code4InitUndo(cb *Code4) int {
 	// Close all open data files
 	Code4Close(cb)
 
-	// Reset structure  
+	// Reset structure
 	cb.Initialized = false
 	cb.ErrorCode = ErrorNone
 	cb.FieldBuffer = nil
@@ -107,17 +107,17 @@ func Code4Close(cb *Code4) int {
 		if current == nil {
 			break // Safety check
 		}
-		
+
 		// Remove from list first to avoid issues
 		list4Remove(&cb.DataFileList, current)
-		
+
 		// Try to get the Data4 from its embedded Link4
 		// Note: We use Data4 not Data4File since that's what gets added to DataFileList
 		data := data4FromLink(current)
 		if data != nil && data.DataFile != nil {
 			// Close the file safely
 			File4Close(&data.DataFile.File)
-			
+
 			// Close memo file if open
 			if data.DataFile.MemoFile != nil {
 				File4Close(&data.DataFile.MemoFile.File)
@@ -151,7 +151,7 @@ func Code4Exit(cb *Code4) {
 // Returns the date format string, or default if cb is nil.
 func Code4DateFormat(cb *Code4) string {
 	if cb == nil {
-		return "MM/DD/YY"  // Default format
+		return "MM/DD/YY" // Default format
 	}
 	// TODO: Implement date format storage in Code4
 	return "MM/DD/YY"
@@ -185,7 +185,7 @@ func Code4Data(cb *Code4, alias string) *Data4 {
 	if cb == nil || alias == "" {
 		return nil
 	}
-	
+
 	// Traverse DataFileList to find matching alias
 	current := list4First(&cb.DataFileList)
 	for current != nil {
@@ -194,14 +194,14 @@ func Code4Data(cb *Code4, alias string) *Data4 {
 		if data != nil && strings.EqualFold(data.Alias, alias) {
 			return data
 		}
-		
+
 		// Move to next
 		current = list4Next(&cb.DataFileList, current)
 		if current == list4First(&cb.DataFileList) {
 			break // Circular list, we've come back to start
 		}
 	}
-	
+
 	return nil
 }
 
@@ -245,15 +245,15 @@ func list4Add(list *List4, link *Link4) {
 		// Insert at end
 		lastNode := list.LastNode
 		firstNode := lastNode.Next
-		
+
 		link.Next = firstNode
 		link.Prev = lastNode
 		lastNode.Next = link
 		firstNode.Prev = link
-		
+
 		list.LastNode = link
 	}
-	
+
 	list.NumLinks++
 }
 
@@ -271,7 +271,7 @@ func list4Remove(list *List4, link *Link4) {
 		// Update neighboring links
 		link.Prev.Next = link.Next
 		link.Next.Prev = link.Prev
-		
+
 		// Update list pointers if necessary
 		if list.LastNode == link {
 			list.LastNode = link.Prev
@@ -280,11 +280,11 @@ func list4Remove(list *List4, link *Link4) {
 			list.Selected = link.Next
 		}
 	}
-	
+
 	// Clear the removed link
 	link.Next = nil
 	link.Prev = nil
-	
+
 	list.NumLinks--
 }
 
@@ -327,7 +327,7 @@ func data4FromLink(link *Link4) *Data4 {
 	if link == nil {
 		return nil
 	}
-	// Calculate offset of Link field in Data4 structure  
+	// Calculate offset of Link field in Data4 structure
 	// Link is the first field, so offset is 0
 	return (*Data4)(unsafe.Pointer(link))
 }
@@ -339,7 +339,7 @@ func data4FromLink(link *Link4) *Data4 {
 // and removes temporary files if applicable. It's safe to call
 // multiple times on the same file handle.
 //
-// Returns ErrorNone on success, ErrorMemory if f4 is nil, 
+// Returns ErrorNone on success, ErrorMemory if f4 is nil,
 // ErrorClose if the file close operation fails.
 func File4Close(f4 *File4) int {
 	if f4 == nil {
@@ -350,7 +350,7 @@ func File4Close(f4 *File4) int {
 	if f4.Handle != nil {
 		// Clean up any locks associated with this file
 		CleanupLocks(f4)
-		
+
 		// Only close if the handle is actually open
 		if f4.FileCreated {
 			err := f4.Handle.Close()
@@ -460,7 +460,7 @@ func File4Open(f4 *File4, cb *Code4, fileName string, accessMode int) int {
 		return setError(cb, ErrorOpen)
 	}
 
-	// Initialize File4 structure  
+	// Initialize File4 structure
 	f4.Handle = file
 	f4.Name = fileName
 	f4.IsReadOnly = (accessMode == AccessDenyRW)

@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-
 // Code4TransInit initializes transaction system (mirrors code4transInit)
 func Code4TransInit(cb *Code4) int {
 	if cb == nil {
@@ -194,7 +193,7 @@ func D4AppendTrans(data *Data4) int {
 	return ErrorNone
 }
 
-// D4WriteTrans writes record with transaction support  
+// D4WriteTrans writes record with transaction support
 func D4WriteTrans(data *Data4) int {
 	if data == nil || data.RecordOld == nil {
 		return ErrorMemory

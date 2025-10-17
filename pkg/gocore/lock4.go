@@ -166,7 +166,7 @@ func (lm *LockManager) LockRange(file *File4, startPos, length int64) int {
 
 	// Apply system-level range lock (fcntl-style)
 	fd := int(file.Handle.Fd())
-	
+
 	// Use flock for simplicity (would use fcntl with F_SETLK for precise ranges)
 	err := syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
 	if err != nil {

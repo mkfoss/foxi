@@ -139,7 +139,7 @@ func TestIndexAccess(t *testing.T) {
 			}
 
 			indexes := f.Indexes()
-			
+
 			// Test ByIndex with invalid indices
 			if idx := indexes.ByIndex(-1); idx != nil {
 				t.Error("ByIndex(-1) should return nil")
@@ -233,7 +233,7 @@ func TestTagOperations(t *testing.T) {
 			}
 
 			indexes := f.Indexes()
-			
+
 			// Test TagByName with non-existent name
 			if tag := indexes.TagByName("NONEXISTENT"); tag != nil {
 				t.Error("TagByName(NONEXISTENT) should return nil")
@@ -251,7 +251,7 @@ func TestTagOperations(t *testing.T) {
 			// Test tag selection
 			if len(allTags) > 0 {
 				firstTag := allTags[0]
-				
+
 				// Test selecting a tag
 				err := indexes.SelectTag(firstTag)
 				if err != nil {
@@ -297,7 +297,7 @@ func testTag(t *testing.T, tag foxi.Tag, index int) {
 
 	// Test seek operations (these may fail if no data or wrong types)
 	testSeekOperations(t, tag)
-	
+
 	// Test navigation operations (these may fail if tag is empty)
 	testTagNavigation(t, tag)
 }
@@ -357,7 +357,7 @@ func testTagNavigation(t *testing.T, tag foxi.Tag) {
 	key := tag.CurrentKey()
 	recNo := tag.RecordNumber()
 
-	t.Logf("After First(): EOF=%t, BOF=%t, Pos=%f, Key=%s, RecNo=%d", 
+	t.Logf("After First(): EOF=%t, BOF=%t, Pos=%f, Key=%s, RecNo=%d",
 		eof, bof, pos, key, recNo)
 
 	// Try Next

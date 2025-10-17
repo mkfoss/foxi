@@ -92,43 +92,43 @@ func F4Str(field *Field4) string {
 	// Extract raw field data
 	start := int(field.Offset)
 	end := start + int(field.Length)
-	
+
 	if start < 0 || end > len(record) {
 		return ""
 	}
 
 	fieldData := record[start:end]
-	
+
 	// Convert based on field type
 	switch rune(field.Type) {
 	case FieldTypeChar:
 		// Character field - preserve exact content including padding (match C behavior)
 		return string(fieldData)
-		
+
 	case FieldTypeNumeric, FieldTypeFloat:
 		// Numeric field - preserve raw content for binary compatibility
 		return string(fieldData)
-		
+
 	case FieldTypeInteger:
 		// Integer field - preserve raw content for binary compatibility
 		return string(fieldData)
-		
+
 	case FieldTypeCurrency:
 		// Currency field - preserve raw content for binary compatibility
 		return string(fieldData)
-		
+
 	case FieldTypeDate:
 		// Date field - preserve raw format to match C behavior
 		return string(fieldData)
-		
+
 	case FieldTypeDateTime:
 		// DateTime field - preserve raw content for binary compatibility
 		return string(fieldData)
-		
+
 	case FieldTypeLogical:
 		// Logical field - preserve raw content for binary compatibility
 		return string(fieldData)
-		
+
 	case FieldTypeMemo:
 		// Memo field - return memo content if available (CodeBase library behavior)
 		if field.Memo != nil && field.Memo.Contents != nil {
@@ -146,7 +146,7 @@ func F4Str(field *Field4) string {
 		}
 		// Otherwise return spaces like CodeBase library does for empty/failed memo reads
 		return string(fieldData)
-		
+
 	default:
 		// Unknown type - treat as character with preserved padding
 		return string(fieldData)
@@ -183,7 +183,7 @@ func F4Assign(field *Field4, value string) int {
 	// Check bounds
 	start := int(field.Offset)
 	end := start + int(field.Length)
-	
+
 	if start < 0 || end > len(record) {
 		return ErrorData
 	}
@@ -197,29 +197,29 @@ func F4Assign(field *Field4, value string) int {
 	switch rune(field.Type) {
 	case FieldTypeChar:
 		return assignCharField(record[start:end], value)
-		
+
 	case FieldTypeNumeric, FieldTypeFloat:
 		return assignNumericField(record[start:end], value, field.Dec)
-		
+
 	case FieldTypeInteger:
 		return assignIntegerField(record[start:end], value)
-		
+
 	case FieldTypeCurrency:
 		return assignCurrencyField(record[start:end], value)
-		
+
 	case FieldTypeDate:
 		return assignDateField(record[start:end], value)
-		
+
 	case FieldTypeDateTime:
 		return assignCharField(record[start:end], value)
-		
+
 	case FieldTypeLogical:
 		return assignLogicalField(record[start:end], value)
-		
-		case FieldTypeMemo:
-			// Memo field assignment
-			return assignMemoField(field, value)
-		
+
+	case FieldTypeMemo:
+		// Memo field assignment
+		return assignMemoField(field, value)
+
 	default:
 		// Unknown type - treat as character
 		return assignCharField(record[start:end], value)
@@ -234,10 +234,10 @@ func assignCharField(buffer []byte, value string) int {
 	if copyLen > len(buffer) {
 		copyLen = len(buffer)
 	}
-	
+
 	copy(buffer, valueBytes[:copyLen])
 	// buffer is already space-padded from clearing above
-	
+
 	return ErrorNone
 }
 
@@ -344,7 +344,7 @@ func assignMemoField(field *Field4, value string) int {
 		record := field.Data.Record
 		start := int(field.Offset)
 		end := start + int(field.Length)
-		
+
 		if start >= 0 && end <= len(record) {
 			// Clear the memo block number field
 			for i := start; i < end; i++ {
@@ -369,10 +369,10 @@ func assignDateField(buffer []byte, value string) int {
 	}
 
 	value = strings.TrimSpace(value)
-	
+
 	// Try to parse various date formats
 	var dateStr string
-	
+
 	// Check if already in YYYYMMDD format
 	if len(value) == 8 {
 		dateStr = value
@@ -380,27 +380,27 @@ func assignDateField(buffer []byte, value string) int {
 		// Try to parse common formats and convert to YYYYMMDD
 		layouts := []string{
 			"2006/01/02",
-			"2006-01-02", 
+			"2006-01-02",
 			"01/02/2006",
 			"01-02-2006",
 			"2006.01.02",
 		}
-		
+
 		var parsed time.Time
 		var err error
-		
+
 		for _, layout := range layouts {
 			parsed, err = time.Parse(layout, value)
 			if err == nil {
 				break
 			}
 		}
-		
+
 		if err != nil {
 			// Can't parse date - leave as spaces (null date)
 			return ErrorNone
 		}
-		
+
 		dateStr = parsed.Format("20060102")
 	}
 
@@ -408,7 +408,7 @@ func assignDateField(buffer []byte, value string) int {
 	if len(dateStr) == 8 {
 		copy(buffer, []byte(dateStr))
 	}
-	
+
 	return ErrorNone
 }
 
@@ -419,7 +419,7 @@ func assignLogicalField(buffer []byte, value string) int {
 	}
 
 	value = strings.TrimSpace(strings.ToUpper(value))
-	
+
 	switch value {
 	case "T", "TRUE", "Y", "YES", "1":
 		buffer[0] = 'T'
@@ -428,7 +428,7 @@ func assignLogicalField(buffer []byte, value string) int {
 	default:
 		buffer[0] = 'F' // Default to false
 	}
-	
+
 	return ErrorNone
 }
 
@@ -440,36 +440,36 @@ func readMemoContent(memoFile *Memo4File, blockNumStr string) string {
 	if err != nil || n != 1 || blockNum <= 0 {
 		return ""
 	}
-	
+
 	// FPT files use 512-byte blocks by default
 	blockSize := int64(512)
 	if memoFile.BlockSize > 0 {
 		blockSize = int64(memoFile.BlockSize)
 	}
-	
+
 	// Calculate file position (block 0 is header, data starts at block 1)
 	pos := int64(blockNum) * blockSize
-	
+
 	// Read memo block header (first 8 bytes of block)
 	headerBuf := make([]byte, 8)
 	bytesRead := File4Read(&memoFile.File, pos, headerBuf, 8)
 	if bytesRead != 8 {
 		return ""
 	}
-	
+
 	// In FPT format, bytes 4-7 contain the memo length (big endian)
 	memoLength := int32(binary.BigEndian.Uint32(headerBuf[4:8]))
 	if memoLength <= 0 || memoLength > 65535 { // Reasonable size limit
 		return ""
 	}
-	
+
 	// Read memo content (starts after 8-byte block header)
 	contentBuf := make([]byte, memoLength)
 	bytesRead = File4Read(&memoFile.File, pos+8, contentBuf, uint32(memoLength))
 	if bytesRead != uint32(memoLength) {
 		return ""
 	}
-	
+
 	// Convert to string and trim null terminators
 	content := string(contentBuf)
 	content = strings.TrimRight(content, "\x00")
@@ -505,27 +505,27 @@ func F4Double(field *Field4) float64 {
 			return 0.0
 		}
 		return value
-		
+
 	case FieldTypeInteger:
 		value, err := strconv.ParseInt(strings.TrimSpace(strValue), 10, 32)
 		if err != nil {
 			return 0.0
 		}
 		return float64(value)
-		
+
 	case FieldTypeCurrency:
 		value, err := strconv.ParseFloat(strings.TrimSpace(strValue), 64)
 		if err != nil {
 			return 0.0
 		}
 		return value
-		
+
 	case FieldTypeLogical:
 		if strValue == "T" {
 			return 1.0
 		}
 		return 0.0
-		
+
 	default:
 		// Try to parse as number anyway
 		value, err := strconv.ParseFloat(strings.TrimSpace(strValue), 64)
@@ -558,7 +558,7 @@ func F4AssignDouble(field *Field4, value float64) int {
 
 	// Convert double to appropriate string representation
 	var strValue string
-	
+
 	switch rune(field.Type) {
 	case FieldTypeNumeric, FieldTypeFloat:
 		if field.Dec > 0 {
@@ -566,20 +566,20 @@ func F4AssignDouble(field *Field4, value float64) int {
 		} else {
 			strValue = fmt.Sprintf("%.0f", value)
 		}
-		
+
 	case FieldTypeInteger:
 		strValue = fmt.Sprintf("%.0f", value)
-		
+
 	case FieldTypeCurrency:
 		strValue = fmt.Sprintf("%.4f", value) // Always 4 decimal places for currency
-		
+
 	case FieldTypeLogical:
 		if value != 0.0 {
 			strValue = "T"
 		} else {
 			strValue = "F"
 		}
-		
+
 	default:
 		strValue = fmt.Sprintf("%g", value)
 	}
@@ -665,7 +665,7 @@ func F4Blank(field *Field4) {
 
 	start := int(field.Offset)
 	end := start + int(field.Length)
-	
+
 	if start < 0 || end > len(record) {
 		return
 	}
@@ -702,7 +702,7 @@ func F4DateTime(field *Field4) time.Time {
 				return parsed
 			}
 		}
-		
+
 	case FieldTypeDateTime:
 		// FoxPro DateTime field - 8 bytes: 4 bytes Julian date + 4 bytes milliseconds
 		strValue := strings.TrimSpace(F4Str(field))
@@ -710,11 +710,11 @@ func F4DateTime(field *Field4) time.Time {
 			// For simplified implementation, try to parse as formatted datetime
 			layouts := []string{
 				"2006-01-02 15:04:05",
-				"2006/01/02 15:04:05", 
+				"2006/01/02 15:04:05",
 				"01/02/2006 15:04:05",
 				"2006-01-02T15:04:05",
 			}
-			
+
 			for _, layout := range layouts {
 				if parsed, err := time.Parse(layout, strValue); err == nil {
 					return parsed
@@ -737,13 +737,13 @@ func F4AssignDateTime(field *Field4, value time.Time) int {
 	case FieldTypeDate:
 		dateStr := value.Format("20060102")
 		return F4Assign(field, dateStr)
-		
+
 	case FieldTypeDateTime:
 		// FoxPro DateTime field assignment
 		// For simplified implementation, store as formatted string
 		datetimeStr := value.Format("2006-01-02 15:04:05")
 		return F4Assign(field, datetimeStr)
-		
+
 	default:
 		return ErrorData
 	}

@@ -233,7 +233,7 @@ func TestFieldMustVariantsCompile(t *testing.T) {
 							t.Error("Field Must methods should panic on invalid state")
 						}
 					}()
-					
+
 					// Test one Must method - if this works, the interface is correct
 					field.MustAsString()
 				})
@@ -264,7 +264,7 @@ func TestTagMustVariantsCompile(t *testing.T) {
 			defer f.Close()
 
 			indexes := f.Indexes()
-			
+
 			// Get a tag (will be nil without open database/indexes)
 			tag := indexes.TagByName("NONEXISTENT")
 			if tag != nil {
@@ -275,7 +275,7 @@ func TestTagMustVariantsCompile(t *testing.T) {
 							t.Error("Tag Must methods should panic on invalid state")
 						}
 					}()
-					
+
 					// Test one Must method - if this works, the interface is correct
 					tag.MustSeekString("test")
 				})
