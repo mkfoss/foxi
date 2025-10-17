@@ -297,6 +297,8 @@ func list4First(list *List4) *Link4 {
 }
 
 // list4Last returns last link in list
+//
+//nolint:unused // Future use
 func list4Last(list *List4) *Link4 {
 	if list == nil {
 		return nil
@@ -314,6 +316,8 @@ func list4Next(list *List4, current *Link4) *Link4 {
 
 // container_of gets the parent structure from an embedded Link4
 // This mimics the C macro container_of
+//
+//nolint:unused // Future use
 func data4FileFromLink(link *Link4) *Data4File {
 	if link == nil {
 		return nil

@@ -275,7 +275,7 @@ func D4UnlockAll(data *Data4) int {
 		return ErrorMemory
 	}
 
-	var lastError int = ErrorNone
+	var lastError = ErrorNone
 
 	// Unlock all associated index files
 	current := list4First(&data.Indexes)
@@ -322,7 +322,7 @@ func CleanupLocks(file *File4) {
 
 	// Ensure system lock is released
 	if file.Handle != nil {
-		syscall.Flock(int(file.Handle.Fd()), syscall.LOCK_UN)
+		_ = syscall.Flock(int(file.Handle.Fd()), syscall.LOCK_UN) // Ignore error during cleanup
 	}
 }
 

@@ -43,8 +43,8 @@ const (
 	MaxPathLen    = 260
 	MaxFieldName  = 10
 	MaxDateFormat = 20
-	MaxUserIdLen  = 8
-	MaxNetIdLen   = 8
+	MaxUserIDLen  = 8
+	MaxNetIDLen   = 8
 
 	// Return codes (r4 constants)
 	R4Success = 0  // Operation successful
@@ -242,7 +242,7 @@ type Data4 struct {
 
 	// Navigation state
 	recNo         int32 // Current record number
-	atEof         bool  // At end of file
+	atEOF         bool  // At end of file
 	atBof         bool  // At beginning of file
 	lastSeekFound bool  // Last seek operation result
 }

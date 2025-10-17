@@ -31,6 +31,8 @@ import (
 //
 // Returns a pointer to the initialized Data4 structure ready for use,
 // nil on failure (invalid parameters, file creation errors, etc.).
+//
+//nolint:gocyclo // TODO: refactor to reduce complexity by extracting DBF creation steps
 func D4Create(cb *Code4, fileName string, fieldInfo []Field4Info) *Data4 {
 	if cb == nil || fileName == "" || len(fieldInfo) == 0 {
 		return nil
@@ -174,7 +176,7 @@ func D4Create(cb *Code4, fileName string, fieldInfo []Field4Info) *Data4 {
 	// Initialize navigation state
 	data.recNo = 0
 	data.atBof = true
-	data.atEof = true
+	data.atEOF = true
 
 	// Add to CodeBase's data file list
 	list4Add(&cb.DataFileList, &data.Link)

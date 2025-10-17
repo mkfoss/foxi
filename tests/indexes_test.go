@@ -6,6 +6,10 @@ import (
 	"github.com/mkfoss/foxi"
 )
 
+const (
+	cgoBackend = "foxicgo"
+)
+
 func TestIndexesBasicOperations(t *testing.T) {
 	// Test with both backends
 	testCases := []struct {
@@ -14,12 +18,12 @@ func TestIndexesBasicOperations(t *testing.T) {
 		expected foxi.Backend
 	}{
 		{"Pure Go Backend", "", foxi.BackendPureGo},
-		{"CGO Backend", "foxicgo", foxi.BackendCGO},
+		{"CGO Backend", cgoBackend, foxi.BackendCGO},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.backend == "foxicgo" && !cgoBuildTagPresent() {
+			if tc.backend == cgoBackend && !cgoBuildTagPresent() {
 				t.Skip("CGO backend not available in this build")
 			}
 
@@ -44,7 +48,7 @@ func TestIndexesBasicOperations(t *testing.T) {
 
 			// List should be empty when not loaded and auto-load should fail (no DB)
 			list := indexes.List()
-			if list != nil && len(list) > 0 {
+			if len(list) > 0 {
 				t.Error("Expected empty list when no database open")
 			}
 		})
@@ -58,12 +62,12 @@ func TestIndexesLazyLoading(t *testing.T) {
 		expected foxi.Backend
 	}{
 		{"Pure Go Backend", "", foxi.BackendPureGo},
-		{"CGO Backend", "foxicgo", foxi.BackendCGO},
+		{"CGO Backend", cgoBackend, foxi.BackendCGO},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.backend == "foxicgo" && !cgoBuildTagPresent() {
+			if tc.backend == cgoBackend && !cgoBuildTagPresent() {
 				t.Skip("CGO backend not available in this build")
 			}
 
@@ -121,12 +125,12 @@ func TestIndexAccess(t *testing.T) {
 		expected foxi.Backend
 	}{
 		{"Pure Go Backend", "", foxi.BackendPureGo},
-		{"CGO Backend", "foxicgo", foxi.BackendCGO},
+		{"CGO Backend", cgoBackend, foxi.BackendCGO},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.backend == "foxicgo" && !cgoBuildTagPresent() {
+			if tc.backend == cgoBackend && !cgoBuildTagPresent() {
 				t.Skip("CGO backend not available in this build")
 			}
 
@@ -154,56 +158,7 @@ func TestIndexAccess(t *testing.T) {
 			}
 
 			// If we have indexes, test accessing them
-			if indexes.Count() > 0 {
-				list := indexes.List()
-				for i, idx := range list {
-					if idx == nil {
-						t.Errorf("Index %d is nil", i)
-						continue
-					}
-
-					// Test Index interface
-					name := idx.Name()
-					fileName := idx.FileName()
-					tagCount := idx.TagCount()
-					isOpen := idx.IsOpen()
-					isProduction := idx.IsProduction()
-
-					t.Logf("Index %d: Name=%s, File=%s, Tags=%d, Open=%t, Production=%t",
-						i, name, fileName, tagCount, isOpen, isProduction)
-
-					// Test accessing by index
-					sameIdx := indexes.ByIndex(i)
-					if sameIdx != idx {
-						t.Errorf("ByIndex(%d) returned different instance", i)
-					}
-
-					// Test accessing by name
-					if name != "" {
-						namedIdx := indexes.ByName(name)
-						if namedIdx != idx {
-							t.Errorf("ByName(%s) returned different instance", name)
-						}
-					}
-
-					// Test tags if available
-					if tagCount > 0 {
-						tags := idx.Tags()
-						if len(tags) != tagCount {
-							t.Errorf("Tags() returned %d tags, expected %d", len(tags), tagCount)
-						}
-
-						for j, tag := range tags {
-							if tag == nil {
-								t.Errorf("Tag %d is nil", j)
-								continue
-							}
-
-							testTag(t, tag, j)
-						}
-					}
-				}
-			}
+			testIndexesAccess(t, indexes)
 		})
 	}
 }
@@ -215,12 +170,12 @@ func TestTagOperations(t *testing.T) {
 		expected foxi.Backend
 	}{
 		{"Pure Go Backend", "", foxi.BackendPureGo},
-		{"CGO Backend", "foxicgo", foxi.BackendCGO},
+		{"CGO Backend", cgoBackend, foxi.BackendCGO},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.backend == "foxicgo" && !cgoBuildTagPresent() {
+			if tc.backend == cgoBackend && !cgoBuildTagPresent() {
 				t.Skip("CGO backend not available in this build")
 			}
 
@@ -407,6 +362,65 @@ func TestSeekResultString(t *testing.T) {
 	for _, test := range tests {
 		if got := test.result.String(); got != test.expected {
 			t.Errorf("SeekResult(%d).String() = %s, want %s", int(test.result), got, test.expected)
+		}
+	}
+}
+
+// Helper function to test index access operations
+func testIndexesAccess(t *testing.T, indexes *foxi.Indexes) {
+	if indexes.Count() == 0 {
+		return
+	}
+
+	list := indexes.List()
+	for i, idx := range list {
+		if idx == nil {
+			t.Errorf("Index %d is nil", i)
+			continue
+		}
+		testSingleIndex(t, indexes, idx, i)
+	}
+}
+
+// Helper function to test a single index
+func testSingleIndex(t *testing.T, indexes *foxi.Indexes, idx foxi.Index, i int) {
+	// Test Index interface
+	name := idx.Name()
+	fileName := idx.FileName()
+	tagCount := idx.TagCount()
+	isOpen := idx.IsOpen()
+	isProduction := idx.IsProduction()
+
+	t.Logf("Index %d: Name=%s, File=%s, Tags=%d, Open=%t, Production=%t",
+		i, name, fileName, tagCount, isOpen, isProduction)
+
+	// Test accessing by index
+	sameIdx := indexes.ByIndex(i)
+	if sameIdx != idx {
+		t.Errorf("ByIndex(%d) returned different instance", i)
+	}
+
+	// Test accessing by name
+	if name != "" {
+		namedIdx := indexes.ByName(name)
+		if namedIdx != idx {
+			t.Errorf("ByName(%s) returned different instance", name)
+		}
+	}
+
+	// Test tags if available
+	if tagCount > 0 {
+		tags := idx.Tags()
+		if len(tags) != tagCount {
+			t.Errorf("Tags() returned %d tags, expected %d", len(tags), tagCount)
+		}
+
+		for j, tag := range tags {
+			if tag == nil {
+				t.Errorf("Tag %d is nil", j)
+				continue
+			}
+			testTag(t, tag, j)
 		}
 	}
 }

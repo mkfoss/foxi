@@ -36,9 +36,11 @@ import (
 // Backend represents the implementation backend type
 type Backend int
 
+// Backend constants
 const (
-	BackendPureGo Backend = iota // Default: Pure Go implementation (gomkfdbf)
-	BackendCGO                   // CGO implementation (mkfdbf C library)
+	// BackendPureGo is the default pure Go implementation using gomkfdbf
+	BackendPureGo Backend = iota
+	BackendCGO            // CGO implementation (mkfdbf C library)
 )
 
 // String returns the backend name
@@ -406,7 +408,9 @@ func (f *Fields) ByName(name string) Field {
 // FieldType represents the data type of a database field
 type FieldType int
 
+// FieldType constants
 const (
+	// FTUnknown represents an unknown or unsupported field type
 	FTUnknown   FieldType = iota
 	FTCharacter           // C - Character/String
 	FTNumeric             // N - Numeric
@@ -426,16 +430,22 @@ const (
 	FTDouble              // X - Double (not standard)
 )
 
+const (
+	unknownTypeString = "unknown"
+)
+
 // String returns the single-character field type identifier
 func (ft FieldType) String() string {
 	fieldTypes := "CNLDITYMBFGPQVWX"
 	if ft >= 1 && int(ft) <= len(fieldTypes) {
 		return string(fieldTypes[ft-1])
 	}
-	return "unknown"
+	return unknownTypeString
 }
 
 // Name returns the descriptive name of the field type
+//
+//nolint:gocyclo // TODO: refactor to reduce complexity by using lookup table
 func (ft FieldType) Name() string {
 	switch ft {
 	case FTCharacter:
@@ -714,10 +724,12 @@ type Tag interface {
 // SeekResult indicates the result of a seek operation
 type SeekResult int
 
+// SeekResult constants
 const (
-	SeekSuccess SeekResult = iota // Exact match found
-	SeekAfter                     // Positioned after where record would be
-	SeekEOF                       // Would be after last record
+	// SeekSuccess indicates an exact match was found
+	SeekSuccess SeekResult = iota
+	SeekAfter              // Positioned after where record would be
+	SeekEOF                // Would be after last record
 )
 
 // String returns the seek result description

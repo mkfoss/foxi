@@ -51,7 +51,7 @@ func D4AppendStart(data *Data4, lockAttempt int) int {
 
 	// Set current position to the new record
 	data.recNo = newRecordNo
-	data.atEof = false
+	data.atEOF = false
 	data.atBof = (newRecordNo == 1)
 
 	// Mark as changed for transaction tracking
@@ -322,7 +322,7 @@ func D4Pack(data *Data4) int {
 		D4Top(data)
 	} else {
 		data.recNo = 0
-		data.atEof = true
+		data.atEOF = true
 		data.atBof = true
 	}
 
@@ -374,7 +374,7 @@ func D4Zap(data *Data4, startRec int32, numRecs int32) int {
 
 		// Position to empty state
 		data.recNo = 0
-		data.atEof = true
+		data.atEOF = true
 		data.atBof = true
 	}
 
@@ -408,7 +408,7 @@ func D4Position(data *Data4) float64 {
 		return 0.0
 	}
 
-	if data.atEof {
+	if data.atEOF {
 		return 1.0
 	}
 
@@ -433,7 +433,7 @@ func D4PositionSet(data *Data4, position float64) int {
 
 	totalRecords := data.DataFile.Header.NumRecs
 	if totalRecords == 0 {
-		data.atEof = true
+		data.atEOF = true
 		data.atBof = true
 		data.recNo = 0
 		return ErrorNone

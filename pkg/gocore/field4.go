@@ -79,6 +79,8 @@ func F4Dec(field *Field4) uint16 {
 // - Memo: Return memo content from associated memo file
 //
 // Returns the field value as string, empty string if field is nil or invalid.
+//
+//nolint:gocyclo // TODO: refactor to reduce complexity by extracting field type conversion methods
 func F4Str(field *Field4) string {
 	if field == nil || field.Data == nil {
 		return ""

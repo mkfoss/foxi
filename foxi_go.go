@@ -515,6 +515,8 @@ func (f *pureGoField) MustIsNull() bool {
 }
 
 // convertFromGomkFieldType converts gomkfdbf field type to foxi FieldType
+//
+//nolint:gocyclo // TODO: refactor to reduce complexity by using lookup table
 func convertFromGomkFieldType(gomkType rune) FieldType {
 	switch gomkType {
 	case 'C':
@@ -785,7 +787,7 @@ func (idx *pureGoIndex) loadTags() {
 	var tags []Tag
 
 	// Iterate through all tags in this index using gomkfdbf
-	var tag4 *pkg.Tag4 = nil
+	var tag4 *pkg.Tag4
 	for {
 		tag4 = pkg.D4TagNext(idx.data, tag4)
 		if tag4 == nil {
@@ -1007,7 +1009,7 @@ func (tag *pureGoTag) PositionSet(percent float64) error {
 	}
 
 	// Calculate record number from percentage
-	total := int32(tag.data.DataFile.Header.NumRecs)
+	total := tag.data.DataFile.Header.NumRecs
 	recordNo := int32(percent * float64(total))
 	if recordNo < 1 {
 		recordNo = 1

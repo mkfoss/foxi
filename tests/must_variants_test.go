@@ -13,12 +13,12 @@ func TestMustVariantsBasic(t *testing.T) {
 		expected foxi.Backend
 	}{
 		{"Pure Go Backend", "", foxi.BackendPureGo},
-		{"CGO Backend", "foxicgo", foxi.BackendCGO},
+		{"CGO Backend", cgoBackend, foxi.BackendCGO},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.backend == "foxicgo" && !cgoBuildTagPresent() {
+			if tc.backend == cgoBackend && !cgoBuildTagPresent() {
 				t.Skip("CGO backend not available in this build")
 			}
 
@@ -50,12 +50,12 @@ func TestMustVariantsPanicBehavior(t *testing.T) {
 		expected foxi.Backend
 	}{
 		{"Pure Go Backend", "", foxi.BackendPureGo},
-		{"CGO Backend", "foxicgo", foxi.BackendCGO},
+		{"CGO Backend", cgoBackend, foxi.BackendCGO},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.backend == "foxicgo" && !cgoBuildTagPresent() {
+			if tc.backend == cgoBackend && !cgoBuildTagPresent() {
 				t.Skip("CGO backend not available in this build")
 			}
 
@@ -162,12 +162,12 @@ func TestMustVariantsIndexes(t *testing.T) {
 		expected foxi.Backend
 	}{
 		{"Pure Go Backend", "", foxi.BackendPureGo},
-		{"CGO Backend", "foxicgo", foxi.BackendCGO},
+		{"CGO Backend", cgoBackend, foxi.BackendCGO},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.backend == "foxicgo" && !cgoBuildTagPresent() {
+			if tc.backend == cgoBackend && !cgoBuildTagPresent() {
 				t.Skip("CGO backend not available in this build")
 			}
 
@@ -211,12 +211,12 @@ func TestFieldMustVariantsCompile(t *testing.T) {
 		expected foxi.Backend
 	}{
 		{"Pure Go Backend", "", foxi.BackendPureGo},
-		{"CGO Backend", "foxicgo", foxi.BackendCGO},
+		{"CGO Backend", cgoBackend, foxi.BackendCGO},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.backend == "foxicgo" && !cgoBuildTagPresent() {
+			if tc.backend == cgoBackend && !cgoBuildTagPresent() {
 				t.Skip("CGO backend not available in this build")
 			}
 
@@ -251,12 +251,12 @@ func TestTagMustVariantsCompile(t *testing.T) {
 		expected foxi.Backend
 	}{
 		{"Pure Go Backend", "", foxi.BackendPureGo},
-		{"CGO Backend", "foxicgo", foxi.BackendCGO},
+		{"CGO Backend", cgoBackend, foxi.BackendCGO},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.backend == "foxicgo" && !cgoBuildTagPresent() {
+			if tc.backend == cgoBackend && !cgoBuildTagPresent() {
 				t.Skip("CGO backend not available in this build")
 			}
 

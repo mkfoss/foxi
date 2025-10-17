@@ -40,7 +40,7 @@ func D4Open(cb *Code4, fileName string) *Data4 {
 		CodeBase: cb,
 		recNo:    0,
 		atBof:    true,
-		atEof:    false,
+		atEOF:    false,
 	}
 
 	// Create DATA4FILE structure
@@ -388,7 +388,7 @@ func D4Eof(data *Data4) bool {
 	if data == nil {
 		return true
 	}
-	return data.atEof
+	return data.atEOF
 }
 
 // D4Bof returns true if positioned at beginning-of-file.
@@ -482,7 +482,7 @@ func D4Go(data *Data4, recordNum int32) int {
 
 	// Update position state
 	data.recNo = recordNum
-	data.atEof = false // We're on a valid record, not at EOF
+	data.atEOF = false // We're on a valid record, not at EOF
 	data.atBof = (recordNum == 1)
 
 	return ErrorNone
@@ -501,7 +501,7 @@ func D4Top(data *Data4) int {
 	}
 
 	if data.DataFile.Header.NumRecs == 0 {
-		data.atEof = true
+		data.atEOF = true
 		data.atBof = true
 		data.recNo = 0
 		return ErrorNone
@@ -523,7 +523,7 @@ func D4Bottom(data *Data4) int {
 	}
 
 	if data.DataFile.Header.NumRecs == 0 {
-		data.atEof = true
+		data.atEOF = true
 		data.atBof = true
 		data.recNo = 0
 		return ErrorNone
@@ -554,13 +554,13 @@ func D4Skip(data *Data4, numRecs int32) int {
 	// Handle boundary conditions
 	if newRecNo < 1 {
 		data.atBof = true
-		data.atEof = false
+		data.atEOF = false
 		data.recNo = 0
 		return ErrorNone
 	}
 
 	if newRecNo > data.DataFile.Header.NumRecs {
-		data.atEof = true
+		data.atEOF = true
 		data.atBof = false
 		data.recNo = data.DataFile.Header.NumRecs + 1
 		return ErrorNone

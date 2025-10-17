@@ -1,0 +1,190 @@
+# golangci-lint configuration
+# Documentation: https://golangci-lint.run/usage/configuration/
+
+run:
+  # Timeout for analysis
+  timeout: 5m
+  # Exit code when at least one issue was found
+  issues-exit-code: 1
+  # Include test files in analysis
+  tests: true
+
+# Enabled linters - start with essential ones
+linters:
+  enable:
+    # Default linters (always enabled)
+    - errcheck      # Check for unchecked errors
+    - gosimple      # Simplify code
+    - govet         # Vet examines Go source code
+    - ineffassign   # Detect ineffectual assignments
+    - staticcheck   # Static analysis checks
+    - unused        # Check for unused constants, variables, functions and types
+    
+    # Additional recommended linters
+    - gofmt         # Check if code is gofmt-ed
+    - goimports     # Check if imports are sorted
+    - misspell      # Spell checker
+    - unconvert     # Remove unnecessary type conversions
+    - unparam       # Report unused function parameters
+    - gocyclo       # Cyclomatic complexity
+    - goconst       # Find repeated strings that could be constants
+    - revive        # Go linter with many rules (replaces golint)
+    
+  # Disable problematic linters for template projects
+  disable:
+    - typecheck  # May have issues with template code
+
+# Linter-specific settings
+linters-settings:
+  gocyclo:
+    # Minimal cyclomatic complexity to report
+    min-complexity: 15
+    
+  goconst:
+    # Minimal length of string constant
+    min-len: 3
+    # Minimum occurrences of constant string count to trigger issue
+    min-occurrences: 3
+    
+  misspell:
+    # Locale for spell checking (US or UK)
+    locale: US
+    
+  revive:
+    # Enable default rules
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+
+issues:
+  # Maximum issues count per one linter
+  max-issues-per-linter: 0
+  # Maximum count of issues with the same text
+  max-same-issues: 0
+  
+  # Skip generated files and directories
+  exclude-dirs-use-default: true
+  exclude-dirs:
+    - vendor
+  exclude-files:
+    - ".*\\.pb\\.go$"
+    - ".*_gen\\.go$"
+  
+  # Exclude common false positives
+  exclude-rules:
+    # Exclude lll issues for long lines with go:generate
+    - linters: [lll]
+      source: "^//go:generate "
+    
+    # Exclude gosec for test files
+    - path: _test\.go
+      linters: [gosec]
+    
+    # Exclude some staticcheck messages
+    - linters: [staticcheck]
+      text: "SA9003:"  # Empty branch
+
+# Uncomment and customize advanced options below as needed:
+
+# # More strict linters (enable selectively)
+# linters:
+#   enable:
+#     # Code quality
+#     - bodyclose       # Check if HTTP response body is closed
+#     - depguard        # Check if package imports are allowed
+#     - dogsled         # Check for too many blank identifiers
+#     - dupl            # Code clone detection  
+#     - exhaustive      # Check exhaustiveness of enum switch statements
+#     - funlen          # Check function length
+#     - gochecknoinits  # Check there are no init functions
+#     - gochecknoglobals # Check there are no global variables
+#     - gocognit        # Compute cognitive complexities
+#     - gocritic        # Comprehensive Go linter
+#     - godox           # Detect FIXME, TODO and other comment keywords
+#     - gomnd           # Detect magic numbers
+#     - gosec           # Security-focused linter
+#     - lll             # Line length limit
+#     - maligned        # Detect structs that would use less memory if fields were sorted
+#     - nakedret        # Check naked returns
+#     - nestif          # Report deeply nested if statements
+#     - prealloc        # Find slice declarations that could pre-allocate
+#     - rowserrcheck    # Check whether Err of rows is checked
+#     - scopelint       # Check unpinned variables in go programs
+#     - sqlclosecheck   # Check sql.Rows.Close is called
+#     - testpackage     # Require separate _test packages
+#     - whitespace      # Detect leading/trailing whitespace
+#     - wsl             # Add or remove empty lines
+
+# # Advanced linter settings
+# linters-settings:
+#   funlen:
+#     lines: 100        # Max function length in lines
+#     statements: 50    # Max function length in statements
+#   
+#   lll:
+#     line-length: 120  # Max line length
+#   
+#   gomnd:
+#     settings:
+#       mnd:
+#         # Don't include the "operation" and "assign"
+#         checks: [argument,case,condition,return]
+#   
+#   gosec:
+#     # Exclude rules (example: exclude hardcoded credentials check)
+#     excludes:
+#       - G101  # Look for hardcoded credentials
+#   
+#   gocritic:
+#     enabled-tags:
+#       - diagnostic
+#       - experimental
+#       - opinionated
+#       - performance
+#       - style
+#     disabled-checks:
+#       - wrapperFunc
+#       - dupImport # https://github.com/go-critic/go-critic/issues/845
+#   
+#   depguard:
+#     rules:
+#       main:
+#         deny:
+#           - pkg: "github.com/sirupsen/logrus"
+#             desc: "logging is allowed only by logutils.Log"
+
+# # Issue filtering
+# issues:
+#   exclude-rules:
+#     # Exclude specific linter issues by path
+#     - path: _test\.go
+#       linters:
+#         - gomnd
+#         - funlen
+#         - gocyclo
+#     
+#     # Exclude issues in generated files
+#     - path: ".*\\.pb\\.go"
+#       linters:
+#         - all
+#     
+#     # Exclude specific text patterns
+#     - text: "Line contains TODO/BUG/FIXME"
+#       linters: [godox]

@@ -61,6 +61,8 @@ func Code4TransCommit(cb *Code4) int {
 }
 
 // Code4TransRollback rolls back current transaction (mirrors code4transRollback)
+//
+//nolint:gocyclo // TODO: refactor to reduce complexity by extracting transaction rollback steps
 func Code4TransRollback(cb *Code4) int {
 	if cb == nil || cb.TransactionLevel == 0 {
 		return ErrorMemory

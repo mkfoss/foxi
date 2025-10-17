@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# Git pre-commit hook for foxi
+#
+# This hook runs the CI pipeline before allowing a commit.
+#
+
+set -e  # Exit on any error
+
+# Check if mage is available
+if ! command -v mage &> /dev/null; then
+    echo "Error: mage command not found. Please install mage."
+    exit 1
+fi
+
+# Run CI pipeline
+exec mage ci
