@@ -5,6 +5,7 @@ package foxi
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ type pureGoImpl struct {
 	codeBase *pkg.Code4
 	data     *pkg.Data4
 	fields   *Fields
+	indexes  *Indexes
 	filename string
 }
 
@@ -260,6 +262,19 @@ func (p *pureGoImpl) Recall() error {
 	return nil
 }
 
+// Indexes returns the index collection
+func (p *pureGoImpl) Indexes() *Indexes {
+	if p.indexes == nil {
+		p.indexes = &Indexes{
+			impl: &pureGoIndexesImpl{
+				data:   p.data,
+				loaded: false,
+			},
+		}
+	}
+	return p.indexes
+}
+
 // Backend returns the backend type
 func (p *pureGoImpl) Backend() Backend {
 	return BackendPureGo
@@ -470,4 +485,531 @@ func convertFromGomkFieldType(gomkType rune) FieldType {
 	default:
 		return FTUnknown
 	}
+}
+
+// =========================================================================
+// PURE GO INDEX IMPLEMENTATION
+// =========================================================================
+
+// pureGoIndexesImpl implements indexesImpl for the pure Go backend
+type pureGoIndexesImpl struct {
+	data    *pkg.Data4
+	indexes []Index
+	tags    []Tag
+	loaded  bool
+}
+
+// Load discovers and loads all available indexes
+func (idx *pureGoIndexesImpl) Load() error {
+	if idx.data == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	if idx.loaded {
+		return nil // Already loaded
+	}
+
+	var indexes []Index
+	var allTags []Tag
+
+	// Try to open production index (same name as DBF with .CDX extension)
+	dbfFileName := pkg.D4FileName(idx.data)
+	if dbfFileName != "" {
+		baseName := strings.TrimSuffix(dbfFileName, ".dbf")
+		cdxFileName := baseName + ".cdx"
+		
+		// Attempt to open the production index
+		index4 := pkg.I4Open(idx.data, cdxFileName)
+		if index4 != nil {
+			index := &pureGoIndex{
+				index4:       index4,
+				data:         idx.data,
+				isProduction: true,
+			}
+			indexes = append(indexes, index)
+			
+			// Load tags from this index
+			indexTags := index.Tags()
+			allTags = append(allTags, indexTags...)
+		}
+	}
+
+	// TODO: Look for additional standalone index files (.IDX, named .CDX files)
+	// This would require scanning the directory for additional index files
+
+	idx.indexes = indexes
+	idx.tags = allTags
+	idx.loaded = true
+
+	return nil
+}
+
+// Count returns the number of loaded indexes
+func (idx *pureGoIndexesImpl) Count() int {
+	return len(idx.indexes)
+}
+
+// Loaded returns true if indexes have been loaded
+func (idx *pureGoIndexesImpl) Loaded() bool {
+	return idx.loaded
+}
+
+// ByIndex returns the index at the specified position
+func (idx *pureGoIndexesImpl) ByIndex(index int) Index {
+	if index < 0 || index >= len(idx.indexes) {
+		return nil
+	}
+	return idx.indexes[index]
+}
+
+// ByName returns the index with the specified name
+func (idx *pureGoIndexesImpl) ByName(name string) Index {
+	for _, index := range idx.indexes {
+		if strings.EqualFold(index.Name(), name) {
+			return index
+		}
+	}
+	return nil
+}
+
+// List returns all indexes
+func (idx *pureGoIndexesImpl) List() []Index {
+	return idx.indexes
+}
+
+// TagByName returns the tag with the specified name
+func (idx *pureGoIndexesImpl) TagByName(name string) Tag {
+	for _, tag := range idx.tags {
+		if strings.EqualFold(tag.Name(), name) {
+			return tag
+		}
+	}
+	return nil
+}
+
+// SelectedTag returns the currently selected tag
+func (idx *pureGoIndexesImpl) SelectedTag() Tag {
+	if idx.data == nil {
+		return nil
+	}
+	
+	selectedTag := pkg.D4TagSelected(idx.data)
+	if selectedTag == nil {
+		return nil
+	}
+	
+	// Find the matching foxi tag
+	for _, tag := range idx.tags {
+		if pureTag, ok := tag.(*pureGoTag); ok {
+			if pureTag.tag4 == selectedTag {
+				return tag
+			}
+		}
+	}
+	
+	return nil
+}
+
+// SelectTag sets the active tag
+func (idx *pureGoIndexesImpl) SelectTag(tag Tag) error {
+	if idx.data == nil {
+		return fmt.Errorf("database not open")
+	}
+	
+	if tag == nil {
+		// Select natural order (no index)
+		pkg.D4TagSelect(idx.data, nil)
+		return nil
+	}
+	
+	if pureTag, ok := tag.(*pureGoTag); ok {
+		pkg.D4TagSelect(idx.data, pureTag.tag4)
+		return nil
+	}
+	
+	return fmt.Errorf("invalid tag type")
+}
+
+// Tags returns all available tags
+func (idx *pureGoIndexesImpl) Tags() []Tag {
+	return idx.tags
+}
+
+// pureGoIndex implements Index for the pure Go backend
+type pureGoIndex struct {
+	index4       *pkg.Index4
+	data         *pkg.Data4
+	tags         []Tag
+	isProduction bool
+}
+
+// Name returns the index name
+func (idx *pureGoIndex) Name() string {
+	if idx.index4 == nil {
+		return ""
+	}
+	return strings.TrimSuffix(filepath.Base(string(idx.index4.AccessName[:])), ".cdx")
+}
+
+// FileName returns the index file name
+func (idx *pureGoIndex) FileName() string {
+	if idx.index4 == nil {
+		return ""
+	}
+	return string(idx.index4.AccessName[:])
+}
+
+// TagCount returns the number of tags in this index
+func (idx *pureGoIndex) TagCount() int {
+	if idx.index4 == nil {
+		return 0
+	}
+	return pkg.I4NumTags(idx.index4)
+}
+
+// Tag returns the tag at the specified index
+func (idx *pureGoIndex) Tag(index int) Tag {
+	if idx.tags == nil {
+		idx.loadTags()
+	}
+	if index < 0 || index >= len(idx.tags) {
+		return nil
+	}
+	return idx.tags[index]
+}
+
+// TagByName returns the tag with the specified name
+func (idx *pureGoIndex) TagByName(name string) Tag {
+	if idx.tags == nil {
+		idx.loadTags()
+	}
+	for _, tag := range idx.tags {
+		if strings.EqualFold(tag.Name(), name) {
+			return tag
+		}
+	}
+	return nil
+}
+
+// Tags returns all tags in this index
+func (idx *pureGoIndex) Tags() []Tag {
+	if idx.tags == nil {
+		idx.loadTags()
+	}
+	return idx.tags
+}
+
+// IsOpen returns true if the index is open
+func (idx *pureGoIndex) IsOpen() bool {
+	return idx.index4 != nil && idx.index4.IsValid
+}
+
+// IsProduction returns true if this is the production index
+func (idx *pureGoIndex) IsProduction() bool {
+	return idx.isProduction
+}
+
+// loadTags loads all tags from this index
+func (idx *pureGoIndex) loadTags() {
+	if idx.index4 == nil || idx.data == nil {
+		return
+	}
+
+	var tags []Tag
+
+	// Iterate through all tags in this index using gomkfdbf
+	var tag4 *pkg.Tag4 = nil
+	for {
+		tag4 = pkg.D4TagNext(idx.data, tag4)
+		if tag4 == nil {
+			break
+		}
+		
+		// Check if this tag belongs to our index
+		if tag4.Index == idx.index4 {
+			tag := &pureGoTag{
+				tag4:  tag4,
+				data:  idx.data,
+				index: idx,
+			}
+			tags = append(tags, tag)
+		}
+	}
+
+	idx.tags = tags
+}
+
+// pureGoTag implements Tag for the pure Go backend
+type pureGoTag struct {
+	tag4  *pkg.Tag4
+	data  *pkg.Data4
+	index *pureGoIndex
+}
+
+// Name returns the tag name
+func (tag *pureGoTag) Name() string {
+	return pkg.T4Name(tag.tag4)
+}
+
+// Expression returns the tag expression
+func (tag *pureGoTag) Expression() string {
+	return pkg.T4Expr(tag.tag4)
+}
+
+// Filter returns the tag filter expression
+func (tag *pureGoTag) Filter() string {
+	// gomkfdbf doesn't expose filter directly in current API
+	return ""
+}
+
+// KeyLength returns the key length
+func (tag *pureGoTag) KeyLength() int {
+	return int(pkg.T4KeyLen(tag.tag4))
+}
+
+// IsUnique returns true if the tag enforces uniqueness
+func (tag *pureGoTag) IsUnique() bool {
+	return pkg.T4Unique(tag.tag4)
+}
+
+// IsDescending returns true if the tag is in descending order
+func (tag *pureGoTag) IsDescending() bool {
+	return pkg.T4Descending(tag.tag4)
+}
+
+// IsSelected returns true if this tag is currently selected
+func (tag *pureGoTag) IsSelected() bool {
+	if tag.data == nil {
+		return false
+	}
+	return pkg.D4TagSelected(tag.data) == tag.tag4
+}
+
+// Seek performs a seek operation with generic value
+func (tag *pureGoTag) Seek(value interface{}) (SeekResult, error) {
+	if tag.data == nil {
+		return SeekEOF, fmt.Errorf("database not open")
+	}
+
+	// Convert value to string for seeking
+	var searchValue string
+	switch v := value.(type) {
+	case string:
+		searchValue = v
+	case int:
+		searchValue = fmt.Sprintf("%d", v)
+	case float64:
+		searchValue = fmt.Sprintf("%g", v)
+	default:
+		searchValue = fmt.Sprintf("%v", v)
+	}
+
+	return tag.SeekString(searchValue)
+}
+
+// SeekString performs a seek operation with string value
+func (tag *pureGoTag) SeekString(value string) (SeekResult, error) {
+	if tag.data == nil || tag.tag4 == nil {
+		return SeekEOF, fmt.Errorf("database not open")
+	}
+
+	// Select this tag first
+	pkg.D4TagSelect(tag.data, tag.tag4)
+
+	// Perform seek using gomkfdbf D4Seek function
+	result := pkg.D4Seek(tag.data, value)
+
+	// Convert gomkfdbf result to foxi result
+	switch result {
+	case pkg.R4Success:
+		return SeekSuccess, nil
+	case pkg.R4After:
+		return SeekAfter, nil
+	case pkg.R4Eof:
+		return SeekEOF, nil
+	default:
+		return SeekEOF, fmt.Errorf("seek failed with code %d", result)
+	}
+}
+
+// SeekDouble performs a seek operation with float64 value
+func (tag *pureGoTag) SeekDouble(value float64) (SeekResult, error) {
+	return tag.SeekString(fmt.Sprintf("%g", value))
+}
+
+// SeekInt performs a seek operation with int value
+func (tag *pureGoTag) SeekInt(value int) (SeekResult, error) {
+	return tag.SeekString(fmt.Sprintf("%d", value))
+}
+
+// First moves to first record in tag order
+func (tag *pureGoTag) First() error {
+	if tag.data == nil || tag.tag4 == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	// Select this tag and go to first using data-level navigation
+	pkg.D4TagSelect(tag.data, tag.tag4)
+	result := pkg.D4Top(tag.data)
+	if result != pkg.ErrorNone {
+		return fmt.Errorf("failed to go to first record")
+	}
+	return nil
+}
+
+// Last moves to last record in tag order
+func (tag *pureGoTag) Last() error {
+	if tag.data == nil || tag.tag4 == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	// Select this tag and go to last using data-level navigation
+	pkg.D4TagSelect(tag.data, tag.tag4)
+	result := pkg.D4Bottom(tag.data)
+	if result != pkg.ErrorNone {
+		return fmt.Errorf("failed to go to last record")
+	}
+	return nil
+}
+
+// Next moves to next record in tag order
+func (tag *pureGoTag) Next() error {
+	if tag.data == nil || tag.tag4 == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	// Ensure this tag is selected
+	if pkg.D4TagSelected(tag.data) != tag.tag4 {
+		pkg.D4TagSelect(tag.data, tag.tag4)
+	}
+
+	result := pkg.D4Skip(tag.data, 1)
+	if result != pkg.ErrorNone {
+		return fmt.Errorf("failed to move to next record")
+	}
+	return nil
+}
+
+// Previous moves to previous record in tag order
+func (tag *pureGoTag) Previous() error {
+	if tag.data == nil || tag.tag4 == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	// Ensure this tag is selected
+	if pkg.D4TagSelected(tag.data) != tag.tag4 {
+		pkg.D4TagSelect(tag.data, tag.tag4)
+	}
+
+	result := pkg.D4Skip(tag.data, -1)
+	if result != pkg.ErrorNone {
+		return fmt.Errorf("failed to move to previous record")
+	}
+	return nil
+}
+
+// Position returns the current position as a percentage (0.0-1.0)
+func (tag *pureGoTag) Position() float64 {
+	if tag.data == nil || tag.tag4 == nil {
+		return 0.0
+	}
+
+	// Ensure this tag is selected
+	if pkg.D4TagSelected(tag.data) != tag.tag4 {
+		pkg.D4TagSelect(tag.data, tag.tag4)
+	}
+
+	// Simple position calculation based on record number
+	current := float64(pkg.D4RecNo(tag.data))
+	total := float64(tag.data.DataFile.Header.NumRecs)
+	if total <= 0 {
+		return 0.0
+	}
+	return current / total
+}
+
+// PositionSet moves to the specified position percentage (0.0-1.0)
+func (tag *pureGoTag) PositionSet(percent float64) error {
+	if tag.data == nil || tag.tag4 == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	// Ensure this tag is selected
+	if pkg.D4TagSelected(tag.data) != tag.tag4 {
+		pkg.D4TagSelect(tag.data, tag.tag4)
+	}
+
+	// Calculate record number from percentage
+	total := int32(tag.data.DataFile.Header.NumRecs)
+	recordNo := int32(percent * float64(total))
+	if recordNo < 1 {
+		recordNo = 1
+	}
+	if recordNo > total {
+		recordNo = total
+	}
+
+	result := pkg.D4Go(tag.data, recordNo)
+	if result != pkg.ErrorNone {
+		return fmt.Errorf("failed to set position")
+	}
+	return nil
+}
+
+// CurrentKey returns the current index key value
+func (tag *pureGoTag) CurrentKey() string {
+	if tag.data == nil || tag.tag4 == nil {
+		return ""
+	}
+
+	// Ensure this tag is selected
+	if pkg.D4TagSelected(tag.data) != tag.tag4 {
+		pkg.D4TagSelect(tag.data, tag.tag4)
+	}
+
+	// For now, return a simple representation
+	// In a full implementation, this would evaluate the tag expression
+	return fmt.Sprintf("key_%d", pkg.D4RecNo(tag.data))
+}
+
+// RecordNumber returns the current record number
+func (tag *pureGoTag) RecordNumber() int {
+	if tag.data == nil || tag.tag4 == nil {
+		return 0
+	}
+
+	// Ensure this tag is selected
+	if pkg.D4TagSelected(tag.data) != tag.tag4 {
+		pkg.D4TagSelect(tag.data, tag.tag4)
+	}
+
+	return int(pkg.D4RecNo(tag.data))
+}
+
+// EOF returns true if at end of index
+func (tag *pureGoTag) EOF() bool {
+	if tag.data == nil || tag.tag4 == nil {
+		return true
+	}
+
+	// Ensure this tag is selected
+	if pkg.D4TagSelected(tag.data) != tag.tag4 {
+		pkg.D4TagSelect(tag.data, tag.tag4)
+	}
+
+	return pkg.D4Eof(tag.data)
+}
+
+// BOF returns true if at beginning of index
+func (tag *pureGoTag) BOF() bool {
+	if tag.data == nil || tag.tag4 == nil {
+		return true
+	}
+
+	// Ensure this tag is selected  
+	if pkg.D4TagSelected(tag.data) != tag.tag4 {
+		pkg.D4TagSelect(tag.data, tag.tag4)
+	}
+
+	return pkg.D4Bof(tag.data)
 }

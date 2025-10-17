@@ -29,6 +29,7 @@
 package foxi
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -101,6 +102,9 @@ type foxiImpl interface {
 	Deleted() bool
 	Delete() error
 	Recall() error
+
+	// Index operations
+	Indexes() *Indexes
 
 	// Backend information
 	Backend() Backend
@@ -208,6 +212,12 @@ func (f *Foxi) Delete() error {
 // Recall undeletes the current record.
 func (f *Foxi) Recall() error {
 	return f.impl.Recall()
+}
+
+// Indexes returns the index collection with lazy loading support.
+// Indexes are not loaded until first access.
+func (f *Foxi) Indexes() *Indexes {
+	return f.impl.Indexes()
 }
 
 // Backend returns information about which backend implementation is being used.
@@ -394,5 +404,219 @@ func (c Codepage) String() string {
 		return "International MS-DOS (850)"
 	default:
 		return "Unknown Codepage"
+	}
+}
+
+// =========================================================================
+// INDEX SUPPORT
+// =========================================================================
+
+// Indexes provides lazy-loaded access to database indexes
+type Indexes struct {
+	impl indexesImpl // Backend implementation
+}
+
+// indexesImpl defines the interface for backend-specific index operations
+type indexesImpl interface {
+	// Core operations
+	Load() error
+	Count() int
+	Loaded() bool
+
+	// Access methods
+	ByIndex(index int) Index
+	ByName(name string) Index
+	List() []Index
+
+	// Tag operations
+	TagByName(name string) Tag
+	SelectedTag() Tag
+	SelectTag(tag Tag) error
+	Tags() []Tag
+}
+
+// Load loads all available indexes from the database files.
+// This is called automatically on first access but can be called explicitly.
+func (idx *Indexes) Load() error {
+	if idx.impl == nil {
+		return fmt.Errorf("indexes not initialized")
+	}
+	return idx.impl.Load()
+}
+
+// Count returns the number of loaded indexes.
+func (idx *Indexes) Count() int {
+	if idx.impl == nil {
+		return 0
+	}
+	return idx.impl.Count()
+}
+
+// Loaded returns true if indexes have been loaded from disk.
+func (idx *Indexes) Loaded() bool {
+	if idx.impl == nil {
+		return false
+	}
+	return idx.impl.Loaded()
+}
+
+// ByIndex returns the index at the specified position.
+func (idx *Indexes) ByIndex(index int) Index {
+	if idx.impl == nil {
+		return nil
+	}
+	// Auto-load on first access
+	if !idx.impl.Loaded() {
+		if err := idx.impl.Load(); err != nil {
+			return nil
+		}
+	}
+	return idx.impl.ByIndex(index)
+}
+
+// ByName returns the index with the specified name.
+func (idx *Indexes) ByName(name string) Index {
+	if idx.impl == nil {
+		return nil
+	}
+	// Auto-load on first access
+	if !idx.impl.Loaded() {
+		if err := idx.impl.Load(); err != nil {
+			return nil
+		}
+	}
+	return idx.impl.ByName(name)
+}
+
+// List returns all available indexes.
+func (idx *Indexes) List() []Index {
+	if idx.impl == nil {
+		return nil
+	}
+	// Auto-load on first access
+	if !idx.impl.Loaded() {
+		if err := idx.impl.Load(); err != nil {
+			return nil
+		}
+	}
+	return idx.impl.List()
+}
+
+// TagByName returns the tag with the specified name.
+func (idx *Indexes) TagByName(name string) Tag {
+	if idx.impl == nil {
+		return nil
+	}
+	// Auto-load on first access
+	if !idx.impl.Loaded() {
+		if err := idx.impl.Load(); err != nil {
+			return nil
+		}
+	}
+	return idx.impl.TagByName(name)
+}
+
+// SelectedTag returns the currently selected tag for record ordering.
+func (idx *Indexes) SelectedTag() Tag {
+	if idx.impl == nil {
+		return nil
+	}
+	return idx.impl.SelectedTag()
+}
+
+// SelectTag sets the active tag for record navigation order.
+// Pass nil to use natural record order (no index).
+func (idx *Indexes) SelectTag(tag Tag) error {
+	if idx.impl == nil {
+		return fmt.Errorf("indexes not initialized")
+	}
+	return idx.impl.SelectTag(tag)
+}
+
+// Tags returns all available tags from all indexes.
+func (idx *Indexes) Tags() []Tag {
+	if idx.impl == nil {
+		return nil
+	}
+	// Auto-load on first access
+	if !idx.impl.Loaded() {
+		if err := idx.impl.Load(); err != nil {
+			return nil
+		}
+	}
+	return idx.impl.Tags()
+}
+
+// Index represents a database index file (e.g., .CDX file)
+type Index interface {
+	// Properties
+	Name() string
+	FileName() string
+	TagCount() int
+	
+	// Access
+	Tag(index int) Tag
+	TagByName(name string) Tag
+	Tags() []Tag
+	
+	// State
+	IsOpen() bool
+	IsProduction() bool
+}
+
+// Tag represents an index tag within an index file
+type Tag interface {
+	// Properties
+	Name() string
+	Expression() string
+	Filter() string
+	KeyLength() int
+	
+	// Attributes
+	IsUnique() bool
+	IsDescending() bool
+	IsSelected() bool
+	
+	// Operations
+	Seek(value interface{}) (SeekResult, error)
+	SeekString(value string) (SeekResult, error)
+	SeekDouble(value float64) (SeekResult, error)
+	SeekInt(value int) (SeekResult, error)
+	
+	// Navigation (when tag is selected)
+	First() error
+	Last() error
+	Next() error
+	Previous() error
+	Position() float64
+	PositionSet(percent float64) error
+	
+	// Current state
+	CurrentKey() string
+	RecordNumber() int
+	EOF() bool
+	BOF() bool
+}
+
+// SeekResult indicates the result of a seek operation
+type SeekResult int
+
+const (
+	SeekSuccess SeekResult = iota // Exact match found
+	SeekAfter                     // Positioned after where record would be
+	SeekEOF                       // Would be after last record
+)
+
+// String returns the seek result description
+func (sr SeekResult) String() string {
+	switch sr {
+	case SeekSuccess:
+		return "success"
+	case SeekAfter:
+		return "after"
+	case SeekEOF:
+		return "eof"
+	default:
+		return "unknown"
 	}
 }

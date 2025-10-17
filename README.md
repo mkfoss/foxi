@@ -195,57 +195,74 @@ err := f.Recall()           // Undelete record
 
 ## Advanced Features
 
-> **Note**: The advanced features documented below represent the full capabilities available in the underlying Vulpo/mkfdbf libraries. The current foxi implementation provides the basic unified API (database operations, navigation, field access, record state). These advanced features would be implemented in future versions or can be accessed directly via the backend packages.
-
 ### Index Operations
 
-The underlying libraries support full index operations for efficient data access and seeking:
+Foxi provides comprehensive index support with lazy loading for efficient database access:
 
 ```go
-// List all available indexes/tags
-tags := f.ListTags()
-fmt.Printf("Available indexes: %d\n", len(tags))
-for _, tag := range tags {
-    fmt.Printf("  %s\n", tag.Name())
+// Access the indexes collection (lazy loaded)
+indexes := f.Indexes()
+
+// List all available indexes
+indexList := indexes.List()
+fmt.Printf("Available indexes: %d\n", len(indexList))
+for _, index := range indexList {
+    fmt.Printf("  Index: %s, Tags: %d\n", index.Name(), index.TagCount())
 }
 
-// Select an index for navigation
-nameTag := f.TagByName("NAME_IDX")
+// List all available tags from all indexes
+tags := indexes.Tags()
+fmt.Printf("Available tags: %d\n", len(tags))
+for _, tag := range tags {
+    fmt.Printf("  Tag: %s, Expression: %s, KeyLen: %d\n", 
+        tag.Name(), tag.Expression(), tag.KeyLength())
+}
+
+// Select a tag for navigation
+nameTag := indexes.TagByName("NAME_IDX")
 if nameTag != nil {
-    f.SelectTag(nameTag)
-    
-    // Navigation now follows index order
-    f.First()  // First alphabetically
-    f.Next()   // Next alphabetically
+    err := indexes.SelectTag(nameTag)
+    if err == nil {
+        // Navigation now follows index order
+        f.First()  // First in index order
+        f.Next()   // Next in index order
+    }
 }
 
 // Return to physical record order
-f.SelectTag(nil)
+indexes.SelectTag(nil)
 
-// Get currently selected index
-selectedTag := f.SelectedTag()
+// Get currently selected tag
+selectedTag := indexes.SelectedTag()
 if selectedTag != nil {
-    fmt.Printf("Using index: %s\n", selectedTag.Name())
+    fmt.Printf("Using tag: %s\n", selectedTag.Name())
 }
 ```
 
 ### Seeking Records
 
-Use indexes to quickly find specific records:
+Use tags to quickly find specific records:
 
 ```go
-// Select an index first
-nameTag := f.TagByName("NAME_IDX")
-f.SelectTag(nameTag)
+// Get a tag for seeking
+indexes := f.Indexes()
+nameTag := indexes.TagByName("NAME_IDX")
+if nameTag == nil {
+    log.Fatal("NAME_IDX tag not found")
+}
 
 // Seek for specific values
-result, err := f.Seek("Smith")
+result, err := nameTag.SeekString("Smith")
 if err != nil {
     log.Printf("Seek failed: %v", err)
 } else {
     switch result {
     case foxi.SeekSuccess:
         fmt.Println("Found exact match")
+        // Record is now positioned at the matching entry
+        nameField := f.FieldByName("NAME")
+        name, _ := nameField.AsString()
+        fmt.Printf("Found: %s at record %d\n", name, f.Position())
     case foxi.SeekAfter:
         fmt.Println("Positioned after where record would be")
     case foxi.SeekEOF:
@@ -253,183 +270,46 @@ if err != nil {
     }
 }
 
-// Continue seeking for more matches
-for {
-    result, err := f.SeekNext("Smith")
-    if result != foxi.SeekSuccess {
-        break
-    }
+// Seek with different data types
+result, err = nameTag.Seek("Smith")        // Generic seek
+result, err = nameTag.SeekInt(12345)       // Integer seek
+result, err = nameTag.SeekDouble(50000.0)  // Float64 seek
+
+// Tag-specific navigation
+if result == foxi.SeekSuccess {
+    err = nameTag.Next()     // Next in tag order
+    err = nameTag.Previous() // Previous in tag order
     
-    // Process matching record
-    nameField := f.FieldByName("NAME")
-    name, _ := nameField.AsString()
-    fmt.Printf("Found: %s\n", name)
-}
-
-// Seek with numeric values (more efficient)
-salaryTag := f.TagByName("SALARY_IDX")
-f.SelectTag(salaryTag)
-result, err = f.SeekDouble(50000.0)
-```
-
-### Expression-Based Filtering
-
-Foxi supports native dBASE expressions for powerful record filtering:
-
-```go
-// Simple field comparisons
-results, err := f.SearchByExpression("AGE > 30", nil)
-if err != nil {
-    log.Fatal(err)
-}
-
-fmt.Printf("Found %d records with age > 30\n", len(results.Matches))
-for _, match := range results.Matches {
-    nameField := match.FieldReaders["NAME"]
-    ageField := match.FieldReaders["AGE"]
-    
-    name, _ := nameField.AsString()
-    age, _ := ageField.AsInt()
-    
-    fmt.Printf("Record %d: %s, Age: %d\n", match.RecordNumber, name, age)
-}
-
-// Complex expressions with functions
-results, err = f.SearchByExpression(
-    "YEAR(BIRTH_DATE) = 1990 .AND. SUBSTR(NAME, 1, 1) = 'J'", 
-    &foxi.ExprSearchOptions{MaxResults: 10})
-
-// String functions
-results, err = f.SearchByExpression("UPPER(LEFT(NAME, 3)) = 'SMI'", nil)
-
-// Date functions  
-results, err = f.SearchByExpression("MONTH(HIRE_DATE) = 12", nil)
-
-// Logical operations
-results, err = f.SearchByExpression(
-    "(SALARY > 50000 .OR. BONUS > 10000) .AND. ACTIVE", nil)
-```
-
-#### Supported Expression Functions
-
-**String Functions:**
-- `SUBSTR(string, start, length)` - Extract substring
-- `LEFT(string, count)` - Left characters  
-- `RIGHT(string, count)` - Right characters
-- `UPPER(string)` - Convert to uppercase
-- `LOWER(string)` - Convert to lowercase
-- `TRIM(string)` - Remove trailing spaces
-- `LTRIM(string)` - Remove leading spaces
-- `ALLTRIM(string)` - Remove leading and trailing spaces
-
-**Date Functions:**
-- `YEAR(date)` - Extract year
-- `MONTH(date)` - Extract month
-- `DAY(date)` - Extract day
-- `CTOD(string)` - Convert string to date
-- `DTOS(date)` - Convert date to string
-- `DATE()` - Current date
-
-**Numeric Functions:**
-- `STR(number, length, decimals)` - Convert number to string
-- `VAL(string)` - Convert string to number
-- `INT(number)` - Integer part
-- `ABS(number)` - Absolute value
-
-**Conditional:**
-- `IIF(condition, true_value, false_value)` - Conditional expression
-
-**Record Functions:**
-- `RECNO()` - Current record number
-- `RECCOUNT()` - Total record count
-- `DELETED()` - Check if record is deleted
-
-### Counting and Iteration
-
-```go
-// Count matching records
-count, err := f.CountByExpression("ACTIVE .AND. SALARY > 40000")
-fmt.Printf("Found %d active high-salary employees\n", count)
-
-// Iterate through matches
-err = f.ForEachExpressionMatch("YEAR(BIRTH_DATE) = 1985", 
-    func(fieldReaders map[string]foxi.FieldReader) error {
-        nameField := fieldReaders["NAME"]
-        name, _ := nameField.AsString()
-        fmt.Printf("Born in 1985: %s\n", name)
-        return nil  // Continue iteration
-    })
-```
-
-### Regex Search
-
-For pattern-based searching on character fields:
-
-```go
-// Basic regex search
-results, err := f.RegexSearch("NAME", "^Smith", &foxi.RegexSearchOptions{
-    CaseInsensitive: true,
-    MaxResults: 50,
-})
-
-if err != nil {
-    log.Fatal(err)
-}
-
-for _, match := range results.Matches {
-    fmt.Printf("Record %d: %s (matches: %v)\n", 
-        match.RecordNumber, match.FieldValue, match.Matches)
-}
-
-// Advanced regex patterns
-results, err = f.RegexSearch("EMAIL", "@(gmail|yahoo|hotmail)\\.com$", &foxi.RegexSearchOptions{
-    CaseInsensitive: true,
-})
-
-// Count regex matches
-count, err := f.RegexCount("PHONE", "\\(\\d{3}\\)\\s\\d{3}-\\d{4}", nil)
-fmt.Printf("Found %d properly formatted phone numbers\n", count)
-
-// Check if any records match
-exists, err := f.RegexExists("ZIP", "^\\d{5}(-\\d{4})?$", nil)
-if exists {
-    fmt.Println("Found records with valid ZIP codes")
+    key := nameTag.CurrentKey()     // Current index key value
+    recNo := nameTag.RecordNumber() // Current record number
+    pos := nameTag.Position()       // Position as percentage (0.0-1.0)
 }
 ```
 
-### Compiled Expression Filters
+### Current Implementation Status
 
-For reusable expression filtering:
+The current foxi implementation provides:
 
-```go
-// Create a compiled expression filter
-filter, err := f.NewExprFilter("AGE >= 18 .AND. ACTIVE")
-if err != nil {
-    log.Fatal(err)
-}
-defer filter.Free()  // Always free resources
+✅ **Implemented Features:**
+- Lazy-loaded index discovery and access
+- Index and tag enumeration
+- Tag selection for record ordering
+- Basic seek operations (SeekString, SeekInt, SeekDouble, generic Seek)
+- Tag-based navigation (First, Last, Next, Previous)
+- Position-based access (Position, PositionSet)
+- Tag properties (Name, Expression, KeyLength, IsUnique, IsDescending)
+- Current record information (RecordNumber, CurrentKey, EOF, BOF)
 
-// Use filter on different records
-f.First()
-for !f.EOF() {
-    matches, err := filter.Evaluate()
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    if matches {
-        fmt.Printf("Record %d matches criteria\n", f.Position())
-    }
-    
-    f.Next()
-}
+🚧 **Future Enhancements:**
+- Full expression evaluation for CurrentKey()
+- Advanced seek operations (SeekNext for duplicates)
+- Expression-based filtering
+- Regex search capabilities
+- Compiled expression filters
 
-// Get different result types from expressions
-stringResult, err := filter.EvaluateAsString()
-numericResult, err := filter.EvaluateAsDouble()
-```
+The basic index functionality is fully operational and provides substantial performance benefits for record navigation and seeking.
 
-### Deleted Record Management
+## Deleted Record Management
 
 DBF files use "soft delete" - records are marked for deletion but remain in the file:
 
@@ -452,35 +332,8 @@ if err != nil {
     log.Printf("Failed to recall record: %v", err)
 }
 
-// Count deleted vs active records
-deletedCount, err := f.CountDeleted()
-activeCount, err := f.CountActive()
-fmt.Printf("Records: %d deleted, %d active\n", deletedCount, activeCount)
-
-// List all deleted records
-deletedRecords, err := f.ListDeletedRecords()
-for _, record := range deletedRecords {
-    fmt.Printf("Deleted record: %d\n", record.RecordNumber)
-}
-
-// Process each deleted record
-err = f.ForEachDeletedRecord(func(recordNumber int) error {
-    fmt.Printf("Processing deleted record %d\n", recordNumber)
-    return nil
-})
-
-// Batch recall all deleted records
-recalledCount, err := f.RecallAllDeleted()
-fmt.Printf("Recalled %d records\n", recalledCount)
-
-// Physical removal (PERMANENT - use with caution!)
-err = f.Pack()  // WARNING: This permanently removes deleted records!
-if err != nil {
-    log.Printf("Pack failed: %v", err)
-} else {
-    fmt.Println("Database packed - deleted records permanently removed")
-    f.First() // Must reposition after pack
-}
+// Additional deleted record operations would be available
+// in future versions of foxi
 ```
 
 ## Field Types

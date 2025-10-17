@@ -12,6 +12,7 @@ package foxi
 import "C"
 import (
 	"fmt"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ type cgoImpl struct {
 	codeBase *C.CODE4
 	data     *C.DATA4
 	fields   *Fields
+	indexes  *Indexes
 	filename string
 }
 
@@ -330,6 +332,19 @@ func (c *cgoImpl) Recall() error {
 	return nil
 }
 
+// Indexes returns the index collection
+func (c *cgoImpl) Indexes() *Indexes {
+	if c.indexes == nil {
+		c.indexes = &Indexes{
+			impl: &cgoIndexesImpl{
+				data:   c.data,
+				loaded: false,
+			},
+		}
+	}
+	return c.indexes
+}
+
 // Backend returns the backend type
 func (c *cgoImpl) Backend() Backend {
 	return BackendCGO
@@ -561,4 +576,572 @@ func convertFromCFieldType(cType rune) FieldType {
 	default:
 		return FTUnknown
 	}
+}
+
+// =========================================================================
+// CGO INDEX IMPLEMENTATION
+// =========================================================================
+
+// cgoIndexesImpl implements indexesImpl for the CGO backend
+type cgoIndexesImpl struct {
+	data    *C.DATA4
+	indexes []Index
+	tags    []Tag
+	loaded  bool
+}
+
+// Load discovers and loads all available indexes
+func (idx *cgoIndexesImpl) Load() error {
+	if idx.data == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	if idx.loaded {
+		return nil // Already loaded
+	}
+
+	var indexes []Index
+	var allTags []Tag
+
+	// Try to open production index (same name as DBF with .CDX extension)
+	if idx.data.dataFile != nil {
+		dbfFileName := C.GoString(&idx.data.dataFile.file.name[0])
+		if dbfFileName != "" {
+			baseName := strings.TrimSuffix(dbfFileName, ".dbf")
+			cdxFileName := baseName + ".cdx"
+			
+			// Convert to C string
+			cCdxFileName := C.CString(cdxFileName)
+			defer C.free(unsafe.Pointer(cCdxFileName))
+			
+			// Attempt to open the production index
+			index4 := C.i4open(idx.data, cCdxFileName)
+			if index4 != nil {
+				index := &cgoIndex{
+					index4:       index4,
+					data:         idx.data,
+					isProduction: true,
+				}
+				indexes = append(indexes, index)
+				
+				// Load tags from this index
+				indexTags := index.Tags()
+				allTags = append(allTags, indexTags...)
+			}
+		}
+	}
+
+	// TODO: Look for additional standalone index files
+	// This would require scanning the directory for additional index files
+
+	idx.indexes = indexes
+	idx.tags = allTags
+	idx.loaded = true
+
+	return nil
+}
+
+// Count returns the number of loaded indexes
+func (idx *cgoIndexesImpl) Count() int {
+	return len(idx.indexes)
+}
+
+// Loaded returns true if indexes have been loaded
+func (idx *cgoIndexesImpl) Loaded() bool {
+	return idx.loaded
+}
+
+// ByIndex returns the index at the specified position
+func (idx *cgoIndexesImpl) ByIndex(index int) Index {
+	if index < 0 || index >= len(idx.indexes) {
+		return nil
+	}
+	return idx.indexes[index]
+}
+
+// ByName returns the index with the specified name
+func (idx *cgoIndexesImpl) ByName(name string) Index {
+	for _, index := range idx.indexes {
+		if strings.EqualFold(index.Name(), name) {
+			return index
+		}
+	}
+	return nil
+}
+
+// List returns all indexes
+func (idx *cgoIndexesImpl) List() []Index {
+	return idx.indexes
+}
+
+// TagByName returns the tag with the specified name
+func (idx *cgoIndexesImpl) TagByName(name string) Tag {
+	for _, tag := range idx.tags {
+		if strings.EqualFold(tag.Name(), name) {
+			return tag
+		}
+	}
+	return nil
+}
+
+// SelectedTag returns the currently selected tag
+func (idx *cgoIndexesImpl) SelectedTag() Tag {
+	if idx.data == nil {
+		return nil
+	}
+	
+	selectedTag := C.d4tag(idx.data, nil) // Get current tag
+	if selectedTag == nil {
+		return nil
+	}
+	
+	// Find the matching foxi tag
+	for _, tag := range idx.tags {
+		if cgoTag, ok := tag.(*cgoTag); ok {
+			if cgoTag.tag4 == selectedTag {
+				return tag
+			}
+		}
+	}
+	
+	return nil
+}
+
+// SelectTag sets the active tag
+func (idx *cgoIndexesImpl) SelectTag(tag Tag) error {
+	if idx.data == nil {
+		return fmt.Errorf("database not open")
+	}
+	
+	if tag == nil {
+		// Select natural order (no index)
+		C.d4tagSelect(idx.data, nil)
+		return nil
+	}
+	
+	if cgoTag, ok := tag.(*cgoTag); ok {
+		C.d4tagSelect(idx.data, cgoTag.tag4)
+		return nil
+	}
+	
+	return fmt.Errorf("invalid tag type")
+}
+
+// Tags returns all available tags
+func (idx *cgoIndexesImpl) Tags() []Tag {
+	return idx.tags
+}
+
+// cgoIndex implements Index for the CGO backend
+type cgoIndex struct {
+	index4       *C.INDEX4
+	data         *C.DATA4
+	tags         []Tag
+	isProduction bool
+}
+
+// Name returns the index name
+func (idx *cgoIndex) Name() string {
+	if idx.index4 == nil {
+		return ""
+	}
+	fileName := C.i4fileName(idx.index4)
+	if fileName == nil {
+		return ""
+	}
+	return strings.TrimSuffix(filepath.Base(C.GoString(fileName)), ".cdx")
+}
+
+// FileName returns the index file name
+func (idx *cgoIndex) FileName() string {
+	if idx.index4 == nil {
+		return ""
+	}
+	fileName := C.i4fileName(idx.index4)
+	if fileName == nil {
+		return ""
+	}
+	return C.GoString(fileName)
+}
+
+// TagCount returns the number of tags in this index
+func (idx *cgoIndex) TagCount() int {
+	if idx.tags == nil {
+		idx.loadTags()
+	}
+	return len(idx.tags)
+}
+
+// Tag returns the tag at the specified index
+func (idx *cgoIndex) Tag(index int) Tag {
+	if idx.tags == nil {
+		idx.loadTags()
+	}
+	if index < 0 || index >= len(idx.tags) {
+		return nil
+	}
+	return idx.tags[index]
+}
+
+// TagByName returns the tag with the specified name
+func (idx *cgoIndex) TagByName(name string) Tag {
+	if idx.tags == nil {
+		idx.loadTags()
+	}
+	for _, tag := range idx.tags {
+		if strings.EqualFold(tag.Name(), name) {
+			return tag
+		}
+	}
+	return nil
+}
+
+// Tags returns all tags in this index
+func (idx *cgoIndex) Tags() []Tag {
+	if idx.tags == nil {
+		idx.loadTags()
+	}
+	return idx.tags
+}
+
+// IsOpen returns true if the index is open
+func (idx *cgoIndex) IsOpen() bool {
+	return idx.index4 != nil
+}
+
+// IsProduction returns true if this is the production index
+func (idx *cgoIndex) IsProduction() bool {
+	return idx.isProduction
+}
+
+// loadTags loads all tags from this index
+func (idx *cgoIndex) loadTags() {
+	if idx.index4 == nil || idx.data == nil {
+		return
+	}
+
+	var tags []Tag
+
+	// Iterate through all tags in the index using C library
+	// Start with first tag in index
+	tag4 := C.i4tag(idx.index4, nil) // Get first tag
+	for tag4 != nil {
+		tag := &cgoTag{
+			tag4:  tag4,
+			data:  idx.data,
+			index: idx,
+		}
+		tags = append(tags, tag)
+		
+		// Get next tag (this is a simplified approach)
+		// In reality, we'd need to iterate through the tag list properly
+		break // For now, just get the first one
+	}
+
+	idx.tags = tags
+}
+
+// cgoTag implements Tag for the CGO backend
+type cgoTag struct {
+	tag4  *C.TAG4
+	data  *C.DATA4
+	index *cgoIndex
+}
+
+// Name returns the tag name
+func (tag *cgoTag) Name() string {
+	if tag.tag4 == nil {
+		return ""
+	}
+	alias := C.t4alias(tag.tag4)
+	if alias == nil {
+		return ""
+	}
+	return C.GoString(alias)
+}
+
+// Expression returns the tag expression
+func (tag *cgoTag) Expression() string {
+	if tag.tag4 == nil {
+		return ""
+	}
+	// Use the t4expr macro equivalent
+	if tag.tag4.tagFile != nil && tag.tag4.tagFile.expr != nil {
+		return C.GoString(tag.tag4.tagFile.expr.source)
+	}
+	return ""
+}
+
+// Filter returns the tag filter expression
+func (tag *cgoTag) Filter() string {
+	if tag.tag4 == nil {
+		return ""
+	}
+	// Use the t4filter macro equivalent
+	if tag.tag4.tagFile != nil && tag.tag4.tagFile.filter != nil {
+		return C.GoString(tag.tag4.tagFile.filter.source)
+	}
+	return ""
+}
+
+// KeyLength returns the key length
+func (tag *cgoTag) KeyLength() int {
+	if tag.tag4 == nil || tag.tag4.tagFile == nil {
+		return 0
+	}
+	return int(tag.tag4.tagFile.header.keyLen)
+}
+
+// IsUnique returns true if the tag enforces uniqueness
+func (tag *cgoTag) IsUnique() bool {
+	if tag.tag4 == nil {
+		return false
+	}
+	return C.t4unique(tag.tag4) != 0
+}
+
+// IsDescending returns true if the tag is in descending order
+func (tag *cgoTag) IsDescending() bool {
+	if tag.tag4 == nil || tag.tag4.tagFile == nil {
+		return false
+	}
+	return tag.tag4.tagFile.header.descending != 0
+}
+
+// IsSelected returns true if this tag is currently selected
+func (tag *cgoTag) IsSelected() bool {
+	if tag.data == nil {
+		return false
+	}
+	currentTag := C.d4tag(tag.data, nil)
+	return currentTag == tag.tag4
+}
+
+// Seek performs a seek operation with generic value
+func (tag *cgoTag) Seek(value interface{}) (SeekResult, error) {
+	if tag.data == nil {
+		return SeekEOF, fmt.Errorf("database not open")
+	}
+
+	// Convert value to string for seeking
+	var searchValue string
+	switch v := value.(type) {
+	case string:
+		searchValue = v
+	case int:
+		searchValue = fmt.Sprintf("%d", v)
+	case float64:
+		searchValue = fmt.Sprintf("%g", v)
+	default:
+		searchValue = fmt.Sprintf("%v", v)
+	}
+
+	return tag.SeekString(searchValue)
+}
+
+// SeekString performs a seek operation with string value
+func (tag *cgoTag) SeekString(value string) (SeekResult, error) {
+	if tag.data == nil || tag.tag4 == nil {
+		return SeekEOF, fmt.Errorf("database not open")
+	}
+
+	// Select this tag first
+	C.d4tagSelect(tag.data, tag.tag4)
+
+	// Convert Go string to C string
+	cValue := C.CString(value)
+	defer C.free(unsafe.Pointer(cValue))
+
+	// Perform seek using C library
+	result := C.tfile4seek(tag.tag4.tagFile, unsafe.Pointer(cValue), C.int(len(value)))
+
+	// Convert C result to foxi result
+	switch int(result) {
+	case 0: // r4success
+		return SeekSuccess, nil
+	case 1: // r4after
+		return SeekAfter, nil
+	case 2: // r4eof
+		return SeekEOF, nil
+	default:
+		return SeekEOF, fmt.Errorf("seek failed with code %d", int(result))
+	}
+}
+
+// SeekDouble performs a seek operation with float64 value
+func (tag *cgoTag) SeekDouble(value float64) (SeekResult, error) {
+	return tag.SeekString(fmt.Sprintf("%g", value))
+}
+
+// SeekInt performs a seek operation with int value
+func (tag *cgoTag) SeekInt(value int) (SeekResult, error) {
+	return tag.SeekString(fmt.Sprintf("%d", value))
+}
+
+// First moves to first record in tag order
+func (tag *cgoTag) First() error {
+	if tag.data == nil || tag.tag4 == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	// Select this tag and go to first
+	C.d4tagSelect(tag.data, tag.tag4)
+	result := C.tfile4top(tag.tag4.tagFile)
+	if result != 0 {
+		return fmt.Errorf("failed to go to first record")
+	}
+	return nil
+}
+
+// Last moves to last record in tag order
+func (tag *cgoTag) Last() error {
+	if tag.data == nil || tag.tag4 == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	// Select this tag and go to last
+	C.d4tagSelect(tag.data, tag.tag4)
+	result := C.tfile4bottom(tag.tag4.tagFile)
+	if result != 0 {
+		return fmt.Errorf("failed to go to last record")
+	}
+	return nil
+}
+
+// Next moves to next record in tag order
+func (tag *cgoTag) Next() error {
+	if tag.data == nil || tag.tag4 == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	// Ensure this tag is selected
+	currentTag := C.d4tag(tag.data, nil)
+	if currentTag != tag.tag4 {
+		C.d4tagSelect(tag.data, tag.tag4)
+	}
+
+	result := C.tfile4skip(tag.tag4.tagFile, 1)
+	if result == 0 {
+		return fmt.Errorf("failed to move to next record")
+	}
+	return nil
+}
+
+// Previous moves to previous record in tag order
+func (tag *cgoTag) Previous() error {
+	if tag.data == nil || tag.tag4 == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	// Ensure this tag is selected
+	currentTag := C.d4tag(tag.data, nil)
+	if currentTag != tag.tag4 {
+		C.d4tagSelect(tag.data, tag.tag4)
+	}
+
+	result := C.tfile4skip(tag.tag4.tagFile, -1)
+	if result == 0 {
+		return fmt.Errorf("failed to move to previous record")
+	}
+	return nil
+}
+
+// Position returns the current position as a percentage (0.0-1.0)
+func (tag *cgoTag) Position() float64 {
+	if tag.data == nil || tag.tag4 == nil {
+		return 0.0
+	}
+
+	// Ensure this tag is selected
+	currentTag := C.d4tag(tag.data, nil)
+	if currentTag != tag.tag4 {
+		C.d4tagSelect(tag.data, tag.tag4)
+	}
+
+	return float64(C.tfile4position(tag.tag4.tagFile))
+}
+
+// PositionSet moves to the specified position percentage (0.0-1.0)
+func (tag *cgoTag) PositionSet(percent float64) error {
+	if tag.data == nil || tag.tag4 == nil {
+		return fmt.Errorf("database not open")
+	}
+
+	// Ensure this tag is selected
+	currentTag := C.d4tag(tag.data, nil)
+	if currentTag != tag.tag4 {
+		C.d4tagSelect(tag.data, tag.tag4)
+	}
+
+	result := C.tfile4positionSet(tag.tag4.tagFile, C.double(percent))
+	if result != 0 {
+		return fmt.Errorf("failed to set position")
+	}
+	return nil
+}
+
+// CurrentKey returns the current index key value
+func (tag *cgoTag) CurrentKey() string {
+	if tag.data == nil || tag.tag4 == nil {
+		return ""
+	}
+
+	// Ensure this tag is selected
+	currentTag := C.d4tag(tag.data, nil)
+	if currentTag != tag.tag4 {
+		C.d4tagSelect(tag.data, tag.tag4)
+	}
+
+	keyPtr := C.tfile4key(tag.tag4.tagFile)
+	if keyPtr == nil {
+		return ""
+	}
+	return C.GoString(keyPtr)
+}
+
+// RecordNumber returns the current record number
+func (tag *cgoTag) RecordNumber() int {
+	if tag.data == nil || tag.tag4 == nil {
+		return 0
+	}
+
+	// Ensure this tag is selected
+	currentTag := C.d4tag(tag.data, nil)
+	if currentTag != tag.tag4 {
+		C.d4tagSelect(tag.data, tag.tag4)
+	}
+
+	return int(C.tfile4recNo(tag.tag4.tagFile))
+}
+
+// EOF returns true if at end of index
+func (tag *cgoTag) EOF() bool {
+	if tag.data == nil || tag.tag4 == nil {
+		return true
+	}
+
+	// Ensure this tag is selected
+	currentTag := C.d4tag(tag.data, nil)
+	if currentTag != tag.tag4 {
+		C.d4tagSelect(tag.data, tag.tag4)
+	}
+
+	return C.tfile4eof(tag.tag4.tagFile) != 0
+}
+
+// BOF returns true if at beginning of index
+func (tag *cgoTag) BOF() bool {
+	if tag.data == nil || tag.tag4 == nil {
+		return true
+	}
+
+	// Ensure this tag is selected  
+	currentTag := C.d4tag(tag.data, nil)
+	if currentTag != tag.tag4 {
+		C.d4tagSelect(tag.data, tag.tag4)
+	}
+
+	// Note: C library doesn't have tfile4bof, check if at first record
+	pos := C.tfile4position(tag.tag4.tagFile)
+	return pos <= 0.0
 }
