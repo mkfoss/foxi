@@ -447,6 +447,73 @@ func (f *pureGoField) IsBinary() bool {
 	return f.gomkField.Binary != 0
 }
 
+// ==========================================================================
+// MUST VARIANTS - Panic instead of returning errors
+// ==========================================================================
+
+// MustValue returns the field's native value, panicking on error
+func (f *pureGoField) MustValue() interface{} {
+	value, err := f.Value()
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
+// MustAsString returns field value as string, panicking on error
+func (f *pureGoField) MustAsString() string {
+	value, err := f.AsString()
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
+// MustAsInt returns field value as integer, panicking on error
+func (f *pureGoField) MustAsInt() int {
+	value, err := f.AsInt()
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
+// MustAsFloat returns field value as float64, panicking on error
+func (f *pureGoField) MustAsFloat() float64 {
+	value, err := f.AsFloat()
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
+// MustAsBool returns field value as boolean, panicking on error
+func (f *pureGoField) MustAsBool() bool {
+	value, err := f.AsBool()
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
+// MustAsTime returns field value as time.Time, panicking on error
+func (f *pureGoField) MustAsTime() time.Time {
+	value, err := f.AsTime()
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
+// MustIsNull checks if field value is null, panicking on error
+func (f *pureGoField) MustIsNull() bool {
+	value, err := f.IsNull()
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
 // convertFromGomkFieldType converts gomkfdbf field type to foxi FieldType
 func convertFromGomkFieldType(gomkType rune) FieldType {
 	switch gomkType {
@@ -1012,4 +1079,79 @@ func (tag *pureGoTag) BOF() bool {
 	}
 
 	return pkg.D4Bof(tag.data)
+}
+
+// ==========================================================================
+// TAG MUST VARIANTS - Panic instead of returning errors
+// ==========================================================================
+
+// MustSeek performs a seek operation with generic value, panicking on error
+func (tag *pureGoTag) MustSeek(value interface{}) SeekResult {
+	result, err := tag.Seek(value)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustSeekString performs a seek operation with string value, panicking on error
+func (tag *pureGoTag) MustSeekString(value string) SeekResult {
+	result, err := tag.SeekString(value)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustSeekDouble performs a seek operation with float64 value, panicking on error
+func (tag *pureGoTag) MustSeekDouble(value float64) SeekResult {
+	result, err := tag.SeekDouble(value)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustSeekInt performs a seek operation with int value, panicking on error
+func (tag *pureGoTag) MustSeekInt(value int) SeekResult {
+	result, err := tag.SeekInt(value)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+// MustFirst moves to first record in tag order, panicking on error
+func (tag *pureGoTag) MustFirst() {
+	if err := tag.First(); err != nil {
+		panic(err)
+	}
+}
+
+// MustLast moves to last record in tag order, panicking on error
+func (tag *pureGoTag) MustLast() {
+	if err := tag.Last(); err != nil {
+		panic(err)
+	}
+}
+
+// MustNext moves to next record in tag order, panicking on error
+func (tag *pureGoTag) MustNext() {
+	if err := tag.Next(); err != nil {
+		panic(err)
+	}
+}
+
+// MustPrevious moves to previous record in tag order, panicking on error
+func (tag *pureGoTag) MustPrevious() {
+	if err := tag.Previous(); err != nil {
+		panic(err)
+	}
+}
+
+// MustPositionSet moves to the specified position percentage, panicking on error
+func (tag *pureGoTag) MustPositionSet(percent float64) {
+	if err := tag.PositionSet(percent); err != nil {
+		panic(err)
+	}
 }

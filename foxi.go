@@ -214,6 +214,82 @@ func (f *Foxi) Recall() error {
 	return f.impl.Recall()
 }
 
+// ==========================================================================
+// MUST VARIANTS - Panic instead of returning errors
+// ==========================================================================
+
+// MustOpen establishes a connection to the specified DBF file.
+// Panics if the operation fails.
+func (f *Foxi) MustOpen(filename string) {
+	if err := f.Open(filename); err != nil {
+		panic(err)
+	}
+}
+
+// MustGoto moves to the specified record number (1-indexed).
+// Panics if the operation fails.
+func (f *Foxi) MustGoto(recordNumber int) {
+	if err := f.Goto(recordNumber); err != nil {
+		panic(err)
+	}
+}
+
+// MustFirst moves to the first record in the current order.
+// Panics if the operation fails.
+func (f *Foxi) MustFirst() {
+	if err := f.First(); err != nil {
+		panic(err)
+	}
+}
+
+// MustLast moves to the last record in the current order.
+// Panics if the operation fails.
+func (f *Foxi) MustLast() {
+	if err := f.Last(); err != nil {
+		panic(err)
+	}
+}
+
+// MustNext moves to the next record.
+// Panics if the operation fails.
+func (f *Foxi) MustNext() {
+	if err := f.Next(); err != nil {
+		panic(err)
+	}
+}
+
+// MustPrevious moves to the previous record.
+// Panics if the operation fails.
+func (f *Foxi) MustPrevious() {
+	if err := f.Previous(); err != nil {
+		panic(err)
+	}
+}
+
+// MustSkip skips the specified number of records (positive = forward, negative = backward).
+// Panics if the operation fails.
+func (f *Foxi) MustSkip(count int) {
+	if err := f.Skip(count); err != nil {
+		panic(err)
+	}
+}
+
+// MustDelete marks the current record for deletion (soft delete).
+// Panics if the operation fails.
+func (f *Foxi) MustDelete() {
+	if err := f.Delete(); err != nil {
+		panic(err)
+	}
+}
+
+// MustRecall undeletes the current record.
+// Panics if the operation fails.
+func (f *Foxi) MustRecall() {
+	if err := f.Recall(); err != nil {
+		panic(err)
+	}
+}
+
 // Indexes returns the index collection with lazy loading support.
 // Indexes are not loaded until first access.
 func (f *Foxi) Indexes() *Indexes {
@@ -274,6 +350,15 @@ type Field interface {
 
 	// Null checking
 	IsNull() (bool, error)
+
+	// Must variants - panic instead of returning errors
+	MustValue() interface{}
+	MustAsString() string
+	MustAsInt() int
+	MustAsFloat() float64
+	MustAsBool() bool
+	MustAsTime() time.Time
+	MustIsNull() bool
 
 	// Field definition methods
 	Name() string
@@ -547,6 +632,23 @@ func (idx *Indexes) Tags() []Tag {
 	return idx.impl.Tags()
 }
 
+// MustLoad loads all available indexes from the database files.
+// Panics if the operation fails.
+func (idx *Indexes) MustLoad() {
+	if err := idx.Load(); err != nil {
+		panic(err)
+	}
+}
+
+// MustSelectTag sets the active tag for record navigation order.
+// Pass nil to use natural record order (no index).
+// Panics if the operation fails.
+func (idx *Indexes) MustSelectTag(tag Tag) {
+	if err := idx.SelectTag(tag); err != nil {
+		panic(err)
+	}
+}
+
 // Index represents a database index file (e.g., .CDX file)
 type Index interface {
 	// Properties
@@ -590,6 +692,17 @@ type Tag interface {
 	Previous() error
 	Position() float64
 	PositionSet(percent float64) error
+	
+	// Must variants for operations - panic instead of returning errors
+	MustSeek(value interface{}) SeekResult
+	MustSeekString(value string) SeekResult
+	MustSeekDouble(value float64) SeekResult
+	MustSeekInt(value int) SeekResult
+	MustFirst()
+	MustLast()
+	MustNext()
+	MustPrevious()
+	MustPositionSet(percent float64)
 	
 	// Current state
 	CurrentKey() string

@@ -1,11 +1,10 @@
-# Foxi - High Level Go DBF Package
+# Foxi - Go DBF Package
 
-Foxi is a high-level Go package for reading FoxPro database tables, modeled after the [Vulpo](https://github.com/mkfoss/vulpo) component. It supports both CGO-based and pure Go backends depending on build tags, providing flexibility between performance and deployment simplicity.
+Foxi is a Go package for reading FoxPro database tables. It supports both CGO-based and pure Go backends depending on build tags, providing flexibility between performance and deployment simplicity.
 
 ## Features
 
 - **Dual Backend Support**: Choose between pure Go or CGO implementation at compile time
-- **Vulpo-Compatible API**: Identical interface to the proven Vulpo library
 - **Build Tag Selection**: Simple build tag controls backend selection
 - **Self-Contained**: All dependencies are included in subpackages
 - **Full DBF Support**: Complete Visual FoxPro database compatibility
@@ -309,6 +308,43 @@ The current foxi implementation provides:
 
 The basic index functionality is fully operational and provides substantial performance benefits for record navigation and seeking.
 
+### Must Variants (Panic on Error)
+
+For convenience, foxi provides "Must" variants of all navigation and field read operations that panic instead of returning errors:
+
+```go
+f := foxi.NewFoxi()
+f.MustOpen("customers.dbf")  // Panics if file doesn't exist
+defer f.Close()
+
+// Navigation Must variants
+f.MustFirst()          // Panic instead of error
+f.MustNext()           // Panic instead of error
+f.MustGoto(10)         // Panic instead of error
+
+// Field Must variants
+nameField := f.FieldByName("NAME")
+name := nameField.MustAsString()   // Panic instead of (value, error)
+age := nameField.MustAsInt()       // Panic instead of (value, error)
+null := nameField.MustIsNull()     // Panic instead of (bool, error)
+
+// Index Must variants
+indexes := f.Indexes()
+indexes.MustLoad()                 // Panic instead of error
+nameTag := indexes.TagByName("NAME_IDX")
+if nameTag != nil {
+    indexes.MustSelectTag(nameTag) // Panic instead of error
+    result := nameTag.MustSeekString("Smith") // Panic instead of (SeekResult, error)
+    nameTag.MustFirst()            // Panic instead of error
+}
+```
+
+Must variants are ideal for:
+- Rapid prototyping where you want to fail fast
+- Scripts where error handling isn't critical
+- Cases where you know operations should never fail
+- Reducing boilerplate in simple use cases
+
 ## Deleted Record Management
 
 DBF files use "soft delete" - records are marked for deletion but remain in the file:
@@ -442,23 +478,6 @@ The backend is selected automatically at compile time:
 
 ## Compatibility
 
-### Vulpo Compatibility
-Foxi provides the same API surface as Vulpo for easy migration:
-
-```go
-// Vulpo code
-v := &vulpo.Vulpo{}
-v.Open("data.dbf")
-field := v.FieldByName("NAME")
-name, _ := field.AsString()
-
-// Foxi code (identical)
-f := foxi.NewFoxi()
-f.Open("data.dbf")  
-field := f.FieldByName("NAME")
-name, _ := field.AsString()
-```
-
 ### Database Compatibility
 - **Visual FoxPro**: Full compatibility
 - **dBASE III/IV/V**: Complete support
@@ -513,7 +532,6 @@ MIT License - see LICENSE file for details.
 
 ## Related Projects
 
-- **[Vulpo](https://github.com/mkfoss/vulpo)**: Original Go DBF library (CGO-only)
 - **[gomkfdbf](https://github.com/sean/gomkfdbf)**: Pure Go CodeBase translation  
 - **[mkfdbf](https://github.com/mkfoss/mkfdbf)**: C CodeBase library
 
